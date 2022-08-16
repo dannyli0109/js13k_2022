@@ -17,11 +17,13 @@ const sass = gulpSass(dartSass);
 const concat = require("gulp-concat");
 const rimraf = require("rimraf");
 const cssmin = require("gulp-cssmin");
+const browserSync = require("browser-sync").create();
 
 const htmlPaths = ["src/**/*.html", "src/**/*.css", "src/**/*.ttf"];
 const tsFilesGlob = ["src/**/*.ts", "!./node_modules/**/*.ts"];
 const stypePaths = ["src/**/*.scss"];
 const workingPaths = ["src/working/**/*"];
+const buildPaths = ["./build/**/*", "!./build/working/**/*"];
 
 function buildTs() {
   const tsconfig = require("./src/tsconfig.json");
@@ -111,6 +113,18 @@ function createTsconfig(cb) {
   cb();
 }
 
+function serve() {
+  browserSync.init({
+    server: {
+      baseDir: "./build",
+    },
+  });
+}
+
+function reload() {
+  browserSync.reload();
+}
+
 function watchScss() {
   watch(stypePaths, buildStyles);
 }
@@ -127,6 +141,10 @@ function watchWorking() {
   watch(workingPaths, moveWorkingDirectory);
 }
 
+function watchBuild() {
+  watch(buildPaths).on("change", reload);
+}
+
 exports.build = series(
   clean,
   createTsconfig,
@@ -140,5 +158,5 @@ exports.build = series(
 
 exports.default = series(
   exports.build,
-  parallel(watchScss, watchTs, watchHtml, watchWorking)
+  parallel(watchScss, watchTs, watchHtml, watchWorking, watchBuild, serve)
 );
