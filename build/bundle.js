@@ -38,9 +38,14 @@ var Program = exports.Program = function () {
                 return;
             }
             this._buffers = {};
-            this._shaderProgram = new _ShaderProgram.ShaderProgram();
-            this._shaderProgram.initShaderProgram(this._gl, _ShaderSources.vsSource, _ShaderSources.fsSource);
-            this.createCubeBuffer();
+            this._shaders = {};
+            this._shaders.phong = new _ShaderProgram.ShaderProgram();
+            this._shaders.phong.initShaderProgram(this._gl, _ShaderSources.vsPhongSource, _ShaderSources.fsPhongSource);
+            this._shaders.quad = new _ShaderProgram.ShaderProgram();
+            this._shaders.quad.initShaderProgram(this._gl, _ShaderSources.vsFrameBufferSource, _ShaderSources.fsFrameBufferSource);
+            this.createCubebuffer();
+            this.createQuadbuffer();
+            this.createFramebuffer(this._canvas.width, this._canvas.height);
             window.addEventListener('resize', this.onCanvasResize.bind(this), false);
             this.onCanvasResize();
             this._texture = this.loadTexture("./working/tile000.png");
@@ -52,6 +57,7 @@ var Program = exports.Program = function () {
         value: function onCanvasResize() {
             this._canvas.width = window.innerWidth;
             this._canvas.height = window.innerHeight;
+            this.createFramebuffer(this._canvas.width, this._canvas.height);
         }
     }, {
         key: "update",
@@ -63,12 +69,17 @@ var Program = exports.Program = function () {
     }, {
         key: "updateFrame",
         value: function updateFrame() {
+            var gl = this._gl;
             requestAnimationFrame(this.updateFrame.bind(this));
             this._now = Date.now();
             this._elapsed = this._now - this._then;
             if (this._elapsed > this._fpsInterval) {
                 this._then = this._now - this._elapsed % this._fpsInterval;
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
                 this.drawScene(this._fpsInterval / 1000);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
+                this.drawQuad();
             }
         }
     }, {
@@ -112,8 +123,8 @@ var Program = exports.Program = function () {
             return (value & value - 1) === 0;
         }
     }, {
-        key: "createCubeBuffer",
-        value: function createCubeBuffer() {
+        key: "createCubebuffer",
+        value: function createCubebuffer() {
             var gl = this._gl;
             {
                 var cubeVertexPositionBuffer = gl.createBuffer();
@@ -138,6 +149,74 @@ var Program = exports.Program = function () {
             }
         }
     }, {
+        key: "createQuadbuffer",
+        value: function createQuadbuffer() {
+            var gl = this._gl;
+            var quadPositionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, quadPositionBuffer);
+            var vertices = [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0];
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+            this._buffers.quadPositionBuffer = quadPositionBuffer;
+            var quadTextureCoordBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, quadTextureCoordBuffer);
+            var textureCoordinates = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0];
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+            this._buffers.quadTextureCoordBuffer = quadTextureCoordBuffer;
+        }
+    }, {
+        key: "drawQuad",
+        value: function drawQuad() {
+            var gl = this._gl;
+            gl.useProgram(this._shaders.quad.program);
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+            gl.clearColor(0, 0, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            var positionLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_position');
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadPositionBuffer);
+            gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(positionLocation);
+            var textureLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_textureCoord');
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadTextureCoordBuffer);
+            var num = 2;
+            var type = gl.FLOAT;
+            var normalize = false;
+            var stride = 0;
+            var offset = 0;
+            gl.vertexAttribPointer(textureLocation, num, type, normalize, stride, offset);
+            gl.enableVertexAttribArray(textureLocation);
+            var sampler = gl.getUniformLocation(this._shaders.quad.program, 'u_sampler');
+            gl.uniform1i(sampler, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+    }, {
+        key: "deleteFramebuffer",
+        value: function deleteFramebuffer() {
+            var gl = this._gl;
+            if (this._buffers.framebuffer) gl.deleteFramebuffer(this._buffers.framebuffer);
+            if (this._frameBufferTexture) gl.deleteTexture(this._frameBufferTexture);
+            this._buffers.framebuffer = null;
+            this._frameBufferTexture = null;
+        }
+    }, {
+        key: "createFramebuffer",
+        value: function createFramebuffer(width, height) {
+            var gl = this._gl;
+            this.deleteFramebuffer();
+            this._frameBufferTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            this._buffers.framebuffer = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
+            var attachmentPoint = gl.COLOR_ATTACHMENT0;
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this._frameBufferTexture, 0);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        }
+    }, {
         key: "drawScene",
         value: function drawScene(deltaTime) {
             var gl = this._gl;
@@ -156,7 +235,7 @@ var Program = exports.Program = function () {
                 var normalize = false;
                 var stride = 0;
                 var _offset = 0;
-                var positionLocation = gl.getAttribLocation(this._shaderProgram.program, 'a_position');
+                var positionLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_position');
                 gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexPositionBuffer);
                 gl.vertexAttribPointer(positionLocation, size, type, normalize, stride, _offset);
                 gl.enableVertexAttribArray(positionLocation);
@@ -167,17 +246,17 @@ var Program = exports.Program = function () {
                 var _normalize = false;
                 var _stride = 0;
                 var _offset2 = 0;
-                var textureLocation = gl.getAttribLocation(this._shaderProgram.program, 'a_textureCoord');
+                var textureLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_textureCoord');
                 gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexTextureCoordBuffer);
                 gl.vertexAttribPointer(textureLocation, num, _type, _normalize, _stride, _offset2);
                 gl.enableVertexAttribArray(textureLocation);
             }
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._buffers.cubeVertexIndexBuffer);
             {
-                gl.useProgram(this._shaderProgram.program);
+                gl.useProgram(this._shaders.phong.program);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, this._texture);
-                var sampler = gl.getUniformLocation(this._shaderProgram.program, 'u_sampler');
+                var sampler = gl.getUniformLocation(this._shaders.phong.program, 'u_sampler');
                 gl.uniform1i(sampler, 0);
             }
             var fieldOfView = (0, _Util.degToRad)(45);
@@ -191,8 +270,8 @@ var Program = exports.Program = function () {
             modelViewMatrix.rotateX((0, _Util.degToRad)(this._cubeRotation));
             modelViewMatrix.rotateY((0, _Util.degToRad)(this._cubeRotation));
             modelViewMatrix.rotateZ((0, _Util.degToRad)(this._cubeRotation));
-            var projectionMatrixLocation = gl.getUniformLocation(this._shaderProgram.program, "u_projectionMatrix");
-            var modelViewMatrixLocation = gl.getUniformLocation(this._shaderProgram.program, "u_modelViewMatrix");
+            var projectionMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_projectionMatrix");
+            var modelViewMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_modelViewMatrix");
             gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
             gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
             var primitiveType = gl.TRIANGLES;
@@ -264,8 +343,10 @@ var ShaderProgram = exports.ShaderProgram = function () {
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-var vsSource = exports.vsSource = "\n    attribute vec4 a_position;\n    attribute vec2 a_textureCoord;\n    uniform mat4 u_projectionMatrix;\n    uniform mat4 u_modelViewMatrix;\n\n    varying highp vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
-var fsSource = exports.fsSource = "\n    varying highp vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n\n    void main()\n    {\n        gl_FragColor = texture2D(u_sampler, v_textureCoord);\n    }\n";
+var vsPhongSource = exports.vsPhongSource = "\n    attribute vec4 a_position;\n    attribute vec2 a_textureCoord;\n    uniform mat4 u_projectionMatrix;\n    uniform mat4 u_modelViewMatrix;\n\n    varying highp vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
+var fsPhongSource = exports.fsPhongSource = "\n    varying highp vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n\n    void main()\n    {\n        gl_FragColor = texture2D(u_sampler, v_textureCoord);\n    }\n";
+var vsFrameBufferSource = exports.vsFrameBufferSource = "\n    attribute vec4 a_position;\n    attribute vec2 a_textureCoord;\n\n    varying highp vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
+var fsFrameBufferSource = exports.fsFrameBufferSource = "\n    varying highp vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n\n    void main()\n    {\n        highp vec4 color = texture2D(u_sampler, v_textureCoord);\n        gl_FragColor = vec4(color.r, color.g, color.b, color.a);\n    }\n";
 
 },{}],4:[function(require,module,exports){
 "use strict";

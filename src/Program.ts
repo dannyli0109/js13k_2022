@@ -1,24 +1,29 @@
 import { Mat4 } from "./mathLib/Mat4";
 import { degToRad } from "./mathLib/Util";
 import { ShaderProgram } from "./ShaderProgram";
-import { fsSource, vsSource } from "./ShaderSources";
+import { vsPhongSource, fsPhongSource, vsFrameBufferSource, fsFrameBufferSource } from "./ShaderSources";
 
 
 type Buffers = { 
     [bufferName: string]: WebGLBuffer;
 }
 
+type Shaders = {
+    [shaderName: string]: ShaderProgram;
+}
+
 export class Program
 {
     private _canvas: HTMLCanvasElement;
     private _gl: WebGLRenderingContext;
-    private _shaderProgram: ShaderProgram;
+    private _shaders: Shaders;
     private _buffers: Buffers;
     private _then: number = 0;
     private _fpsInterval: number;
     private _now: number;
     private _elapsed: number;
     private _texture: WebGLTexture;
+    private _frameBufferTexture: WebGLTexture;
     private _cubeRotation: number = 0;
 
     init()
@@ -33,11 +38,18 @@ export class Program
             return;
         }
         this._buffers = {};
+        this._shaders = {};
 
-        this._shaderProgram = new ShaderProgram();
-        this._shaderProgram.initShaderProgram(this._gl, vsSource, fsSource);
+        this._shaders.phong = new ShaderProgram();
+        this._shaders.phong.initShaderProgram(this._gl, vsPhongSource, fsPhongSource);
 
-        this.createCubeBuffer();
+        this._shaders.quad = new ShaderProgram();
+        this._shaders.quad.initShaderProgram(this._gl, vsFrameBufferSource, fsFrameBufferSource);
+
+        this.createCubebuffer();
+        this.createQuadbuffer();
+        this.createFramebuffer(this._canvas.width, this._canvas.height);
+
 
         window.addEventListener('resize', this.onCanvasResize.bind(this), false);
         this.onCanvasResize();
@@ -52,6 +64,7 @@ export class Program
     {
         this._canvas.width = window.innerWidth;
         this._canvas.height = window.innerHeight;
+        this.createFramebuffer(this._canvas.width, this._canvas.height);
     }
     
     update(fps: number)
@@ -64,13 +77,20 @@ export class Program
     
     updateFrame()
     {
+        let gl = this._gl;
         requestAnimationFrame(this.updateFrame.bind(this));
         this._now = Date.now();
         this._elapsed = this._now - this._then;
         if (this._elapsed > this._fpsInterval)
         {
             this._then = this._now - (this._elapsed % this._fpsInterval);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
             this.drawScene(this._fpsInterval / 1000);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
+            this.drawQuad();
+            // console.log(this._frameBufferTexture);
+
             // Set the backbuffer's alpha to 1.0
         }
     }
@@ -131,7 +151,7 @@ export class Program
         return (value & (value - 1)) === 0;
     }
 
-    private createCubeBuffer()
+    private createCubebuffer()
     {
         let gl = this._gl;
 
@@ -232,9 +252,93 @@ export class Program
                 16, 17, 18,   16, 18, 19, // Right face
                 20, 21, 22,   20, 22, 23  // Left face
             ];
+            
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cubeVertexIndices), gl.STATIC_DRAW);
             this._buffers.cubeVertexIndexBuffer = cubeIndexBuffer;
         }
+    }
+
+    private createQuadbuffer()
+    {
+        let gl = this._gl;
+        let quadPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadPositionBuffer);
+        let vertices = [
+            -1, -1, 0,
+            1, -1,  0,
+            1,  1,  0,
+            -1, -1,  0,
+            1,  1,  0,
+            -1,  1,  0
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        this._buffers.quadPositionBuffer = quadPositionBuffer;
+        let quadTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadTextureCoordBuffer);
+        let textureCoordinates = [
+            0.0,  0.0,
+            1.0,  0.0,
+            1.0,  1.0,
+            0.0,  0.0,
+            1.0,  1.0,
+            0.0,  1.0
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+        this._buffers.quadTextureCoordBuffer = quadTextureCoordBuffer;
+    }
+
+    private drawQuad()
+    {
+        let gl = this._gl;
+        gl.useProgram(this._shaders.quad.program);
+        gl.viewport(0, 0,  gl.canvas.width, gl.canvas.height);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        let positionLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_position');
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadPositionBuffer);
+        gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(positionLocation);
+        let textureLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_textureCoord');
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadTextureCoordBuffer);
+        const num = 2; // every coordinate composed of 2 values
+        const type = gl.FLOAT; // the data in the buffer is 32-bit float
+        const normalize = false; // don't normalize
+        const stride = 0; // how many bytes to get from one set to the next
+        const offset = 0; // how many bytes inside the buffer to start from
+        gl.vertexAttribPointer(textureLocation, num, type, normalize, stride, offset);
+        gl.enableVertexAttribArray(textureLocation);
+        let sampler = gl.getUniformLocation(this._shaders.quad.program, 'u_sampler');
+        gl.uniform1i(sampler, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    private deleteFramebuffer()
+    {
+        let gl = this._gl;
+        if (this._buffers.framebuffer) gl.deleteFramebuffer(this._buffers.framebuffer);
+        if (this._frameBufferTexture) gl.deleteTexture(this._frameBufferTexture);
+        this._buffers.framebuffer = null;
+        this._frameBufferTexture = null;
+    }
+
+    private createFramebuffer(width: number, height: number)
+    {
+        let gl = this._gl;
+        this.deleteFramebuffer();
+
+        this._frameBufferTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        this._buffers.framebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
+        const attachmentPoint = gl.COLOR_ATTACHMENT0;
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this._frameBufferTexture, 0);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
     private drawScene(deltaTime: number)
@@ -262,7 +366,7 @@ export class Program
             const normalize = false; // don't normalize the data
             const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
             const offset = 0;        // start at the beginning of the buffer
-            let positionLocation = gl.getAttribLocation(this._shaderProgram.program, 'a_position');
+            let positionLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_position');
             gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexPositionBuffer);
             gl.vertexAttribPointer(positionLocation, size, type, normalize, stride, offset);
             gl.enableVertexAttribArray(positionLocation);
@@ -274,7 +378,7 @@ export class Program
             const normalize = false; // don't normalize
             const stride = 0; // how many bytes to get from one set to the next
             const offset = 0; // how many bytes inside the buffer to start from
-            let textureLocation = gl.getAttribLocation(this._shaderProgram.program, 'a_textureCoord');
+            let textureLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_textureCoord');
             gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexTextureCoordBuffer);
             gl.vertexAttribPointer(textureLocation, num, type, normalize, stride, offset);
             gl.enableVertexAttribArray(textureLocation);
@@ -284,15 +388,15 @@ export class Program
 
         {
             
-            gl.useProgram(this._shaderProgram.program);
+            gl.useProgram(this._shaders.phong.program);
 
 
             // Tell WebGL we want to affect texture unit 0
             gl.activeTexture(gl.TEXTURE0);
 
-            // Bind the texture to texture unit 0
+            // // Bind the texture to texture unit 0
             gl.bindTexture(gl.TEXTURE_2D, this._texture);
-            let sampler = gl.getUniformLocation(this._shaderProgram.program, 'u_sampler');
+            let sampler = gl.getUniformLocation(this._shaders.phong.program, 'u_sampler');
             
             // Tell the shader we bound the texture to texture unit 0
             
@@ -319,8 +423,8 @@ export class Program
 
 
 
-        var projectionMatrixLocation = gl.getUniformLocation(this._shaderProgram.program, "u_projectionMatrix");
-        var modelViewMatrixLocation = gl.getUniformLocation(this._shaderProgram.program, "u_modelViewMatrix");
+        var projectionMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_projectionMatrix");
+        var modelViewMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_modelViewMatrix");
         // Set the matrix.
         gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
         gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
