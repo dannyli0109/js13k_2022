@@ -18,25 +18,35 @@ var _ShaderSources = require("./ShaderSources");
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+var alphabets = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
+
 var Program = exports.Program = function () {
     function Program() {
         _classCallCheck(this, Program);
 
         this._then = 0;
         this._cubeRotation = 0;
+        this._frameTimes = [];
+        this._frameCursor = 0;
+        this._numFrames = 0;
+        this._maxFrames = 60;
+        this._totalFPS = 0;
+        this._fps = 0;
     }
 
     _createClass(Program, [{
         key: "init",
         value: function init() {
             this._canvas = document.getElementById("canvas");
-            this._gl = this._canvas.getContext("webgl", {
+            this._gl = this._canvas.getContext("webgl2", {
                 premultipliedAlpha: false
             });
             if (this._gl == null) {
                 alert("unable to initialise webgl");
                 return;
             }
+            this._textCanvas = document.getElementById("textCanvas");
+            this._textContext = this._textCanvas.getContext("2d");
             this._buffers = {};
             this._shaders = {};
             this._shaders.phong = new _ShaderProgram.ShaderProgram();
@@ -61,26 +71,38 @@ var Program = exports.Program = function () {
         }
     }, {
         key: "update",
-        value: function update(fps) {
-            this._fpsInterval = 1000 / fps;
+        value: function update() {
             this._then = Date.now();
-            this.updateFrame();
+            requestAnimationFrame(this.updateFrame.bind(this));
         }
     }, {
         key: "updateFrame",
-        value: function updateFrame() {
+        value: function updateFrame(now) {
             var gl = this._gl;
-            requestAnimationFrame(this.updateFrame.bind(this));
-            this._now = Date.now();
-            this._elapsed = this._now - this._then;
-            if (this._elapsed > this._fpsInterval) {
-                this._then = this._now - this._elapsed % this._fpsInterval;
-                gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
-                this.drawScene(this._fpsInterval / 1000);
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
-                this.drawQuad();
+            this._elapsed = now - this._then;
+            if (this._elapsed == 0) {
+                this._fps = 0;
+            } else {
+                this._fps = 1000 / this._elapsed;
             }
+            this._then = now;
+            this._textContext.clearRect(0, 0, this._textCanvas.width, this._textCanvas.height);
+            this._textContext.fillText("FPS: " + this.getFps().toFixed(1), 10, 10);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
+            this.drawScene(this._elapsed / 1000);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
+            this.drawQuad();
+            requestAnimationFrame(this.updateFrame.bind(this));
+        }
+    }, {
+        key: "getFps",
+        value: function getFps() {
+            this._totalFPS += this._fps - (this._frameTimes[this._frameCursor] || 0);
+            this._frameTimes[this._frameCursor++] = this._fps;
+            this._numFrames = Math.max(this._numFrames, this._frameCursor);
+            this._frameCursor %= this._maxFrames;
+            return this._totalFPS / this._numFrames;
         }
     }, {
         key: "end",
@@ -169,7 +191,7 @@ var Program = exports.Program = function () {
             var gl = this._gl;
             gl.useProgram(this._shaders.quad.program);
             gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-            gl.clearColor(0, 0, 0, 1);
+            gl.clearColor(1, 0, 0, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
             var positionLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_position');
             gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadPositionBuffer);
@@ -213,8 +235,13 @@ var Program = exports.Program = function () {
             gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
             var attachmentPoint = gl.COLOR_ATTACHMENT0;
             gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this._frameBufferTexture, 0);
-            gl.bindTexture(gl.TEXTURE_2D, null);
+            this._buffers.depthBuffer = gl.createRenderbuffer();
+            gl.bindRenderbuffer(gl.RENDERBUFFER, this._buffers.depthBuffer);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+            gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this._buffers.depthBuffer);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+            gl.bindTexture(gl.TEXTURE_2D, null);
         }
     }, {
         key: "drawScene",
@@ -278,6 +305,9 @@ var Program = exports.Program = function () {
             var offset = 0;
             var count = 36;
             gl.drawElements(primitiveType, count, gl.UNSIGNED_SHORT, offset);
+            modelViewMatrix.translate(1, 0, 0);
+            gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
+            gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
             this._cubeRotation += speed;
         }
     }]);
@@ -291,14 +321,19 @@ var Program = exports.Program = function () {
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
+exports.ShaderProgram = undefined;
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _Renderer = require("./renderer/Renderer");
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var ShaderProgram = exports.ShaderProgram = function () {
     function ShaderProgram() {
         _classCallCheck(this, ShaderProgram);
+
+        this._uniforms = {};
     }
 
     _createClass(ShaderProgram, [{
@@ -328,6 +363,36 @@ var ShaderProgram = exports.ShaderProgram = function () {
             return shader;
         }
     }, {
+        key: "use",
+        value: function use() {
+            _Renderer.Renderer.instance.gl.useProgram(this._program);
+        }
+    }, {
+        key: "getUniformLocation",
+        value: function getUniformLocation(name) {
+            var gl = _Renderer.Renderer.instance.gl;
+            if (!this._uniforms[name]) {
+                this._uniforms[name] = gl.getUniformLocation(this._program, name);
+            }
+            return this._uniforms[name];
+        }
+    }, {
+        key: "setUniformMatrix4fv",
+        value: function setUniformMatrix4fv(name, value) {
+            var gl = _Renderer.Renderer.instance.gl;
+            var location = this.getUniformLocation(name);
+            gl.uniformMatrix4fv(location, false, value);
+            this._uniforms[name] = location;
+        }
+    }, {
+        key: "setUniform1i",
+        value: function setUniform1i(name, value) {
+            var gl = _Renderer.Renderer.instance.gl;
+            var location = this.getUniformLocation(name);
+            gl.uniform1i(location, value);
+            this._uniforms[name] = location;
+        }
+    }, {
         key: "program",
         get: function get() {
             return this._program;
@@ -337,16 +402,16 @@ var ShaderProgram = exports.ShaderProgram = function () {
     return ShaderProgram;
 }();
 
-},{}],3:[function(require,module,exports){
+},{"./renderer/Renderer":7}],3:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-var vsPhongSource = exports.vsPhongSource = "\n    attribute vec4 a_position;\n    attribute vec2 a_textureCoord;\n    uniform mat4 u_projectionMatrix;\n    uniform mat4 u_modelViewMatrix;\n\n    varying highp vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
-var fsPhongSource = exports.fsPhongSource = "\n    varying highp vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n\n    void main()\n    {\n        gl_FragColor = texture2D(u_sampler, v_textureCoord);\n    }\n";
-var vsFrameBufferSource = exports.vsFrameBufferSource = "\n    attribute vec4 a_position;\n    attribute vec2 a_textureCoord;\n\n    varying highp vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
-var fsFrameBufferSource = exports.fsFrameBufferSource = "\n    varying highp vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n\n    void main()\n    {\n        highp vec4 color = texture2D(u_sampler, v_textureCoord);\n        gl_FragColor = vec4(color.r, color.g, color.b, color.a);\n    }\n";
+var vsPhongSource = exports.vsPhongSource = "#version 300 es\n    in vec4 a_position;\n    in vec2 a_textureCoord;\n    uniform mat4 u_projectionMatrix;\n    uniform mat4 u_modelViewMatrix;\n\n    out vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
+var fsPhongSource = exports.fsPhongSource = "#version 300 es\n    precision highp float;\n    in vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n    out vec4 out_color;\n\n    void main()\n    {\n        out_color = texture(u_sampler, v_textureCoord);\n    }\n";
+var vsFrameBufferSource = exports.vsFrameBufferSource = "#version 300 es\n    in vec4 a_position;\n    in vec2 a_textureCoord;\n\n    out vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
+var fsFrameBufferSource = exports.fsFrameBufferSource = "#version 300 es\n    precision highp float;\n    in vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n    out vec4 out_color;\n\n    void main()\n    {\n        highp vec4 color = texture(u_sampler, v_textureCoord);\n        out_color = vec4(color.r, color.g, color.b, color.a);\n    }\n";
 
 },{}],4:[function(require,module,exports){
 "use strict";
@@ -355,7 +420,7 @@ var _Program = require("./Program");
 
 var program = new _Program.Program();
 program.init();
-program.update(60);
+program.update();
 
 },{"./Program":1}],5:[function(require,module,exports){
 "use strict";
@@ -632,8 +697,11 @@ var Mat4 = exports.Mat4 = function () {
         }
     }, {
         key: "orthographic",
-        value: function orthographic(wdith, height, depth) {
-            return new Mat4(2 / wdith, 0, 0, 0, 0, -2 / height, 0, 0, 0, 0, 2 / depth, 0, -1, 1, 0, 1);
+        value: function orthographic(left, right, bottom, top, near, far) {
+            var rl = right - left;
+            var tb = top - bottom;
+            var fn = far - near;
+            return new Mat4(2 / rl, 0, 0, 0, 0, 2 / tb, 0, 0, 0, 0, -2 / fn, 0, -(right + left) / rl, -(top + bottom) / tb, -(far + near) / fn, 1);
         }
     }, {
         key: "perspective",
@@ -641,6 +709,14 @@ var Mat4 = exports.Mat4 = function () {
             var f = 1.0 / Math.tan(fov / 2);
             var nf = 1 / (near - far);
             return new Mat4(f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0);
+        }
+    }, {
+        key: "lookAt",
+        value: function lookAt(position, target, up) {
+            var z = position.subtract(target).normalize();
+            var x = up.cross(z).normalize();
+            var y = z.cross(x).normalize();
+            return new Mat4(x.x, y.x, z.x, 0, x.y, y.y, z.y, 0, x.z, y.z, z.z, 0, -x.dot(position), -y.dot(position), -z.dot(position), 1);
         }
     }]);
 
@@ -661,5 +737,48 @@ function radToDeg(rad) {
 function degToRad(deg) {
     return deg * Math.PI / 180;
 }
+
+},{}],7:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Renderer = exports.Renderer = function () {
+    function Renderer() {
+        _classCallCheck(this, Renderer);
+
+        var canvas = document.createElement("canvas");
+        this._gl = null;
+    }
+
+    _createClass(Renderer, [{
+        key: "onCanvasResize",
+        value: function onCanvasResize() {
+            this._gl.canvas.width = window.innerWidth;
+            this._gl.canvas.height = window.innerHeight;
+        }
+    }, {
+        key: "gl",
+        get: function get() {
+            return this._gl;
+        }
+    }], [{
+        key: "instance",
+        get: function get() {
+            if (!Renderer._instance) {
+                Renderer._instance = new Renderer();
+            }
+            return Renderer._instance;
+        }
+    }]);
+
+    return Renderer;
+}();
 
 },{}]},{},[4])//# sourceMappingURL=bundle.js.map

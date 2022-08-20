@@ -197,13 +197,16 @@ export class Mat4
     /**
      * create a orthographic projection matrix
      */
-    public static orthographic(wdith: number, height: number, depth: number): Mat4
+    public static orthographic(left: never, right: number, bottom: number, top: number, near: number, far: number): Mat4
     {
+        let rl = right - left;
+        let tb = top - bottom;
+        let fn = far - near;
         return new Mat4(
-            2 / wdith, 0, 0, 0,
-            0, -2 / height, 0, 0,
-            0, 0,  2 / depth, 0,
-            -1, 1, 0, 1
+            2 / rl, 0, 0, 0,
+            0, 2 / tb, 0, 0,
+            0, 0, -2 / fn, 0,
+            -(right + left) / rl, -(top + bottom) / tb, -(far + near) / fn, 1
         );
     }
 
@@ -216,6 +219,19 @@ export class Mat4
             0, f, 0, 0,
             0, 0, (far + near) * nf, -1,
             0, 0, (2 * far * near) * nf, 0
+        );
+    }
+
+    public static lookAt(position: Vec3, target: Vec3, up: Vec3): Mat4
+    {
+        let z = position.subtract(target).normalize();
+        let x = up.cross(z).normalize();
+        let y = z.cross(x).normalize();
+        return new Mat4(
+            x.x, y.x, z.x, 0,
+            x.y, y.y, z.y, 0,
+            x.z, y.z, z.z, 0,
+            -x.dot(position), -y.dot(position), -z.dot(position), 1
         );
     }
 }

@@ -1,5 +1,6 @@
 import { Mat4 } from "./mathLib/Mat4";
 import { degToRad } from "./mathLib/Util";
+import { Renderer } from "./renderer/Renderer";
 import { ShaderProgram } from "./ShaderProgram";
 import { vsPhongSource, fsPhongSource, vsFrameBufferSource, fsFrameBufferSource } from "./ShaderSources";
 
@@ -12,24 +13,42 @@ type Shaders = {
     [shaderName: string]: ShaderProgram;
 }
 
+type TextTexture = {
+    texture: WebGLTexture,
+    width: number,
+    height: number
+}
+
+const alphabets = [
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"
+];
+
 export class Program
 {
     private _canvas: HTMLCanvasElement;
-    private _gl: WebGLRenderingContext;
+    private _textCanvas: HTMLCanvasElement;
+    private _textContext: CanvasRenderingContext2D;
+    private _gl: WebGL2RenderingContext;
     private _shaders: Shaders;
     private _buffers: Buffers;
     private _then: number = 0;
-    private _fpsInterval: number;
-    private _now: number;
     private _elapsed: number;
     private _texture: WebGLTexture;
     private _frameBufferTexture: WebGLTexture;
     private _cubeRotation: number = 0;
+    private _frameTimes: number[] = [];
+    private _frameCursor = 0;
+    private _numFrames = 0;
+    private _maxFrames = 60;
+    private _totalFPS = 0;
+    private _fps = 0;
+    private _textTextures: TextTexture[];
 
     init()
     {
         this._canvas = document.getElementById("canvas") as HTMLCanvasElement;
-        this._gl = this._canvas.getContext("webgl", {
+    
+        this._gl = this._canvas.getContext("webgl2", {
             premultipliedAlpha: false
         });
         if (this._gl == null)
@@ -37,6 +56,9 @@ export class Program
             alert("unable to initialise webgl");
             return;
         }
+        
+        this._textCanvas = document.getElementById("textCanvas") as HTMLCanvasElement;
+        this._textContext = this._textCanvas.getContext("2d");
         this._buffers = {};
         this._shaders = {};
 
@@ -48,6 +70,7 @@ export class Program
 
         this.createCubebuffer();
         this.createQuadbuffer();
+        // this.createTextTextures();
         this.createFramebuffer(this._canvas.width, this._canvas.height);
 
 
@@ -57,7 +80,6 @@ export class Program
         this._texture = this.loadTexture("./working/tile000.png");
         this._gl.pixelStorei(this._gl.UNPACK_FLIP_Y_WEBGL, true);
         this._gl.pixelStorei(this._gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-
     }
     
     private onCanvasResize()
@@ -67,32 +89,44 @@ export class Program
         this.createFramebuffer(this._canvas.width, this._canvas.height);
     }
     
-    update(fps: number)
+    update()
     {
-        this._fpsInterval = 1000 / fps;
         this._then = Date.now();
-        this.updateFrame();
+        requestAnimationFrame(this.updateFrame.bind(this));
     }
 
     
-    updateFrame()
+    updateFrame(now: number)
     {
         let gl = this._gl;
-        requestAnimationFrame(this.updateFrame.bind(this));
-        this._now = Date.now();
-        this._elapsed = this._now - this._then;
-        if (this._elapsed > this._fpsInterval)
+        this._elapsed = now - this._then;
+        if (this._elapsed == 0) 
         {
-            this._then = this._now - (this._elapsed % this._fpsInterval);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
-            this.drawScene(this._fpsInterval / 1000);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
-            this.drawQuad();
-            // console.log(this._frameBufferTexture);
-
-            // Set the backbuffer's alpha to 1.0
+            this._fps = 0;
         }
+        else
+        {
+            this._fps = 1000 / this._elapsed;
+        }
+        this._then = now;
+        
+        this._textContext.clearRect(0, 0, this._textCanvas.width, this._textCanvas.height);
+        this._textContext.fillText("FPS: " + this.getFps().toFixed(1), 10, 10);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
+        this.drawScene(this._elapsed / 1000);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
+        this.drawQuad();
+        requestAnimationFrame(this.updateFrame.bind(this));
+    }
+
+    getFps(): number
+    {
+        this._totalFPS += this._fps - (this._frameTimes[this._frameCursor] || 0);
+        this._frameTimes[this._frameCursor++] = this._fps;
+        this._numFrames = Math.max(this._numFrames, this._frameCursor);
+        this._frameCursor %= this._maxFrames;
+        return this._totalFPS / this._numFrames;
     }
 
     end()
@@ -287,12 +321,64 @@ export class Program
         this._buffers.quadTextureCoordBuffer = quadTextureCoordBuffer;
     }
 
+    // private makeTextCanvas(text: string, width: number, height: number)
+    // {
+    //     this._textContext.canvas.width = width;
+    //     this._textContext.canvas.height = height;
+    //     this._textContext.font = "20px monospace";
+    //     this._textContext.textAlign = "center";
+    //     this._textContext.textBaseline = "middle";
+    //     this._textContext.fillStyle = "white";
+    //     this._textContext.clearRect(0, 0, width, height);
+    //     this._textContext.fillText(text, width / 2, height / 2);
+    //     return this._textContext.canvas;
+    // }
+
+    // private createTextTextures()
+    // {
+    //     let gl = this._gl;
+    //     this._textTextures = alphabets.map(alphabet => {
+    //         let textCanvas = this.makeTextCanvas(alphabet, 10, 26);
+    //         let textWidth = textCanvas.width;
+    //         let textHeight = textCanvas.height;
+    //         let textTex = gl.createTexture();
+    //         gl.bindTexture(gl.TEXTURE_2D, textTex);
+    //         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    //         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
+    //         // make sure we can render it even if it's not a power of 2
+    //         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    //         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    //         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    //         return {
+    //           texture: textTex,
+    //           width: textWidth,
+    //           height: textHeight,
+    //         };
+    //     });
+    // }
+
+    // private renderText(text: string, x: number, y: number)
+    // {
+    //     let gl = this._gl;
+    //     for (let i = 0; i < text.length; i++) {
+    //         let letter = text.charCodeAt(i);
+    //         let letterIndex = letter - "a".charCodeAt(0);
+    //         if (letterIndex < 0 || letterIndex >= alphabets.length) {
+    //             continue;
+    //         }
+    //         let tex = this._textTextures[letterIndex];
+    //         gl.activeTexture(gl.TEXTURE0);
+    //         gl.bindTexture(gl.TEXTURE_2D, tex.texture);
+    //         // gl.uniform1i(this._uniforms.uSampler, 0);
+    //     }
+    // }
+
     private drawQuad()
     {
         let gl = this._gl;
         gl.useProgram(this._shaders.quad.program);
         gl.viewport(0, 0,  gl.canvas.width, gl.canvas.height);
-        gl.clearColor(0, 0, 0, 1);
+        gl.clearColor(1, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
         let positionLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_position');
         gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadPositionBuffer);
@@ -337,8 +423,15 @@ export class Program
         gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
         const attachmentPoint = gl.COLOR_ATTACHMENT0;
         gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this._frameBufferTexture, 0);
-        gl.bindTexture(gl.TEXTURE_2D, null);
+        
+        this._buffers.depthBuffer = gl.createRenderbuffer();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, this._buffers.depthBuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this._buffers.depthBuffer);
+        
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+        gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
     private drawScene(deltaTime: number)
@@ -410,6 +503,7 @@ export class Program
         const zFar = 100;
 
         // Compute the matrices
+
         let projectionMatrix = Mat4.perspective(fieldOfView, aspect, zNear, zFar);
         // let projectionMatrix = Mat4.orthographic(gl.canvas.clientWidth, gl.canvas.clientHeight, 400);
         let modelViewMatrix = new Mat4();
@@ -436,11 +530,9 @@ export class Program
 
         // projectionMatrix = Mat4.orthographic(gl.canvas.clientWidth, gl.canvas.clientHeight, 400);
         gl.drawElements(primitiveType, count, gl.UNSIGNED_SHORT, offset);
-        // modelViewMatrix.translate(3, 3, 0);
-        // gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
-        // gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
-        // gl.drawElements(primitiveType, count, this._gl.UNSIGNED_SHORT, offset);
-
+        modelViewMatrix.translate(1, 0, 0);
+        gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
+        gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
         this._cubeRotation += speed;
       }
 }

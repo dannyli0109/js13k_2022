@@ -56,4 +56,35 @@ export class Vec3
     {
         return this._values;
     }
+
+    public add(other: Vec3): Vec3
+    {
+        return new Vec3(this.x + other.x, this.y + other.y, this.z + other.z);
+    }
+
+    public subtract(other: Vec3): Vec3
+    {
+        return new Vec3(this.x - other.x, this.y - other.y, this.z - other.z);
+    }
+
+    public dot(other: Vec3): number
+    {
+        return this.x * other.x + this.y * other.y + this.z * other.z;
+    }
+
+    public cross(other: Vec3): Vec3
+    {
+        return new Vec3(this.y * other.z - this.z * other.y, this.z * other.x - this.x * other.z, this.x * other.y - this.y * other.x);
+    }
+
+    public get length(): number
+    {
+        return Math.sqrt(this.dot(this));
+    }
+
+    public normalize(): Vec3
+    {
+        let length = this.length;
+        return new Vec3(this.x / length, this.y / length, this.z / length);
+    }
 }
