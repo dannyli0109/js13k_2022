@@ -12,6 +12,8 @@ var _Mat = require("./mathLib/Mat4");
 
 var _Util = require("./mathLib/Util");
 
+var _Renderer = require("./renderer/Renderer");
+
 var _ShaderProgram = require("./ShaderProgram");
 
 var _ShaderSources = require("./ShaderSources");
@@ -37,37 +39,33 @@ var Program = exports.Program = function () {
     _createClass(Program, [{
         key: "init",
         value: function init() {
-            this._canvas = document.getElementById("canvas");
-            this._gl = this._canvas.getContext("webgl2", {
-                premultipliedAlpha: false
-            });
-            if (this._gl == null) {
-                alert("unable to initialise webgl");
-                return;
-            }
+            var gl = _Renderer.Renderer.instance.gl;
             this._textCanvas = document.getElementById("textCanvas");
             this._textContext = this._textCanvas.getContext("2d");
             this._buffers = {};
             this._shaders = {};
             this._shaders.phong = new _ShaderProgram.ShaderProgram();
-            this._shaders.phong.initShaderProgram(this._gl, _ShaderSources.vsPhongSource, _ShaderSources.fsPhongSource);
+            this._shaders.phong.initShaderProgram(gl, _ShaderSources.vsPhongSource, _ShaderSources.fsPhongSource);
             this._shaders.quad = new _ShaderProgram.ShaderProgram();
-            this._shaders.quad.initShaderProgram(this._gl, _ShaderSources.vsFrameBufferSource, _ShaderSources.fsFrameBufferSource);
+            this._shaders.quad.initShaderProgram(gl, _ShaderSources.vsFrameBufferSource, _ShaderSources.fsFrameBufferSource);
             this.createCubebuffer();
             this.createQuadbuffer();
-            this.createFramebuffer(this._canvas.width, this._canvas.height);
+            var canvas = _Renderer.Renderer.instance.canvas;
+            this.createFramebuffer(canvas.width, canvas.height);
             window.addEventListener('resize', this.onCanvasResize.bind(this), false);
             this.onCanvasResize();
             this._texture = this.loadTexture("./working/tile000.png");
-            this._gl.pixelStorei(this._gl.UNPACK_FLIP_Y_WEBGL, true);
-            this._gl.pixelStorei(this._gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         }
     }, {
         key: "onCanvasResize",
         value: function onCanvasResize() {
-            this._canvas.width = window.innerWidth;
-            this._canvas.height = window.innerHeight;
-            this.createFramebuffer(this._canvas.width, this._canvas.height);
+            var gl = _Renderer.Renderer.instance.gl;
+            var canvas = _Renderer.Renderer.instance.canvas;
+            canvas.height = window.innerHeight;
+            canvas.width = window.innerWidth;
+            this.createFramebuffer(gl.canvas.width, gl.canvas.height);
         }
     }, {
         key: "update",
@@ -78,7 +76,7 @@ var Program = exports.Program = function () {
     }, {
         key: "updateFrame",
         value: function updateFrame(now) {
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             this._elapsed = now - this._then;
             if (this._elapsed == 0) {
                 this._fps = 0;
@@ -112,7 +110,7 @@ var Program = exports.Program = function () {
         value: function loadTexture(url) {
             var _this = this;
 
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             var texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
             var level = 0;
@@ -147,7 +145,7 @@ var Program = exports.Program = function () {
     }, {
         key: "createCubebuffer",
         value: function createCubebuffer() {
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             {
                 var cubeVertexPositionBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer);
@@ -173,7 +171,7 @@ var Program = exports.Program = function () {
     }, {
         key: "createQuadbuffer",
         value: function createQuadbuffer() {
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             var quadPositionBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, quadPositionBuffer);
             var vertices = [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0];
@@ -188,7 +186,7 @@ var Program = exports.Program = function () {
     }, {
         key: "drawQuad",
         value: function drawQuad() {
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             gl.useProgram(this._shaders.quad.program);
             gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
             gl.clearColor(1, 0, 0, 1);
@@ -213,7 +211,7 @@ var Program = exports.Program = function () {
     }, {
         key: "deleteFramebuffer",
         value: function deleteFramebuffer() {
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             if (this._buffers.framebuffer) gl.deleteFramebuffer(this._buffers.framebuffer);
             if (this._frameBufferTexture) gl.deleteTexture(this._frameBufferTexture);
             this._buffers.framebuffer = null;
@@ -222,7 +220,7 @@ var Program = exports.Program = function () {
     }, {
         key: "createFramebuffer",
         value: function createFramebuffer(width, height) {
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             this.deleteFramebuffer();
             this._frameBufferTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
@@ -246,7 +244,7 @@ var Program = exports.Program = function () {
     }, {
         key: "drawScene",
         value: function drawScene(deltaTime) {
-            var gl = this._gl;
+            var gl = _Renderer.Renderer.instance.gl;
             var speed = 60 * deltaTime;
             gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -315,7 +313,7 @@ var Program = exports.Program = function () {
     return Program;
 }();
 
-},{"./ShaderProgram":2,"./ShaderSources":3,"./mathLib/Mat4":5,"./mathLib/Util":6}],2:[function(require,module,exports){
+},{"./ShaderProgram":2,"./ShaderSources":3,"./mathLib/Mat4":5,"./mathLib/Util":6,"./renderer/Renderer":7}],2:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -744,41 +742,25 @@ function degToRad(deg) {
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-
-var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-var Renderer = exports.Renderer = function () {
-    function Renderer() {
-        _classCallCheck(this, Renderer);
-
-        var canvas = document.createElement("canvas");
-        this._gl = null;
+var Renderer = exports.Renderer = undefined;
+(function (Renderer) {
+    var _canvas = document.getElementById("canvas");
+    var _gl = _canvas.getContext("webgl2", {
+        premultipliedAlpha: false
+    });
+    _canvas.width = window.innerWidth;
+    _canvas.height = window.innerHeight;
+    if (!_gl) {
+        alert("unable to initialise webgl");
     }
-
-    _createClass(Renderer, [{
-        key: "onCanvasResize",
-        value: function onCanvasResize() {
-            this._gl.canvas.width = window.innerWidth;
-            this._gl.canvas.height = window.innerHeight;
+    Renderer.instance = {
+        get gl() {
+            return _gl;
+        },
+        get canvas() {
+            return _canvas;
         }
-    }, {
-        key: "gl",
-        get: function get() {
-            return this._gl;
-        }
-    }], [{
-        key: "instance",
-        get: function get() {
-            if (!Renderer._instance) {
-                Renderer._instance = new Renderer();
-            }
-            return Renderer._instance;
-        }
-    }]);
-
-    return Renderer;
-}();
+    };
+})(Renderer || (exports.Renderer = Renderer = {}));
 
 },{}]},{},[4])//# sourceMappingURL=bundle.js.map

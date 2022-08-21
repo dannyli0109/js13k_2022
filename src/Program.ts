@@ -25,10 +25,10 @@ const alphabets = [
 
 export class Program
 {
-    private _canvas: HTMLCanvasElement;
+    // private _canvas: HTMLCanvasElement;
     private _textCanvas: HTMLCanvasElement;
     private _textContext: CanvasRenderingContext2D;
-    private _gl: WebGL2RenderingContext;
+    // private _gl: WebGL2RenderingContext;
     private _shaders: Shaders;
     private _buffers: Buffers;
     private _then: number = 0;
@@ -46,16 +46,7 @@ export class Program
 
     init()
     {
-        this._canvas = document.getElementById("canvas") as HTMLCanvasElement;
-    
-        this._gl = this._canvas.getContext("webgl2", {
-            premultipliedAlpha: false
-        });
-        if (this._gl == null)
-        {
-            alert("unable to initialise webgl");
-            return;
-        }
+        let gl = Renderer.instance.gl;
         
         this._textCanvas = document.getElementById("textCanvas") as HTMLCanvasElement;
         this._textContext = this._textCanvas.getContext("2d");
@@ -63,30 +54,34 @@ export class Program
         this._shaders = {};
 
         this._shaders.phong = new ShaderProgram();
-        this._shaders.phong.initShaderProgram(this._gl, vsPhongSource, fsPhongSource);
+        this._shaders.phong.initShaderProgram(gl, vsPhongSource, fsPhongSource);
 
         this._shaders.quad = new ShaderProgram();
-        this._shaders.quad.initShaderProgram(this._gl, vsFrameBufferSource, fsFrameBufferSource);
+        this._shaders.quad.initShaderProgram(gl, vsFrameBufferSource, fsFrameBufferSource);
 
         this.createCubebuffer();
         this.createQuadbuffer();
         // this.createTextTextures();
-        this.createFramebuffer(this._canvas.width, this._canvas.height);
+        let canvas = Renderer.instance.canvas;
+
+        this.createFramebuffer(canvas.width, canvas.height);
 
 
         window.addEventListener('resize', this.onCanvasResize.bind(this), false);
         this.onCanvasResize();
         
         this._texture = this.loadTexture("./working/tile000.png");
-        this._gl.pixelStorei(this._gl.UNPACK_FLIP_Y_WEBGL, true);
-        this._gl.pixelStorei(this._gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     }
     
     private onCanvasResize()
     {
-        this._canvas.width = window.innerWidth;
-        this._canvas.height = window.innerHeight;
-        this.createFramebuffer(this._canvas.width, this._canvas.height);
+        let gl = Renderer.instance.gl;
+        let canvas = Renderer.instance.canvas;
+        canvas.height = window.innerHeight;
+        canvas.width = window.innerWidth;
+        this.createFramebuffer(gl.canvas.width, gl.canvas.height);
     }
     
     update()
@@ -98,7 +93,7 @@ export class Program
     
     updateFrame(now: number)
     {
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
         this._elapsed = now - this._then;
         if (this._elapsed == 0) 
         {
@@ -135,7 +130,7 @@ export class Program
     }
 
     loadTexture(url: string): WebGLTexture{
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
       
@@ -187,7 +182,7 @@ export class Program
 
     private createCubebuffer()
     {
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
 
         // cube vertex data
         {
@@ -294,7 +289,7 @@ export class Program
 
     private createQuadbuffer()
     {
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
         let quadPositionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, quadPositionBuffer);
         let vertices = [
@@ -375,7 +370,7 @@ export class Program
 
     private drawQuad()
     {
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
         gl.useProgram(this._shaders.quad.program);
         gl.viewport(0, 0,  gl.canvas.width, gl.canvas.height);
         gl.clearColor(1, 0, 0, 1);
@@ -400,7 +395,7 @@ export class Program
 
     private deleteFramebuffer()
     {
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
         if (this._buffers.framebuffer) gl.deleteFramebuffer(this._buffers.framebuffer);
         if (this._frameBufferTexture) gl.deleteTexture(this._frameBufferTexture);
         this._buffers.framebuffer = null;
@@ -409,7 +404,7 @@ export class Program
 
     private createFramebuffer(width: number, height: number)
     {
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
         this.deleteFramebuffer();
 
         this._frameBufferTexture = gl.createTexture();
@@ -436,7 +431,7 @@ export class Program
 
     private drawScene(deltaTime: number)
     {
-        let gl = this._gl;
+        let gl = Renderer.instance.gl;
         let speed = 60 * deltaTime;
         // Tell WebGL how to convert from clip space to pixels
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);

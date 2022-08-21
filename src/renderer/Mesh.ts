@@ -29,10 +29,9 @@ export class Mesh
     private createVao(): WebGLVertexArrayObject
     {
         const gl = Renderer.instance.gl;
-        return null;
-        // const vao = gl.createVertexArray();
-        // gl.bindVertexArray(vao);
-        // return vao;
+        const vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+        return vao;
     }
 
     private createVbo(data: number[]): WebGLBuffer
@@ -56,7 +55,7 @@ export class Mesh
     public bind(): void
     {
         const gl = Renderer.instance.gl;
-        // gl.bindVertexArray(this.vao);
+        gl.bindVertexArray(this.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
     }
