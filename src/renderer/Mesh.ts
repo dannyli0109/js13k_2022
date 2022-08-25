@@ -2,44 +2,77 @@ import { Mat4 } from "../mathLib/Mat4";
 import { Material } from "./Material";
 import { Renderer } from "./Renderer";
 
+export type MeshData = {
+    vertices: [number, number, number, number],
+    normals: [number, number, number],
+    texCoords: [number, number]
+}
+
+
 export class Mesh
 {
-    public material: Material;
     public indices: number[];
-    public vertices: number[];
-    public uvs: number[];
-    public normals: number[];
     public vao: WebGLVertexArrayObject;
     public vbo: WebGLBuffer;
     public ibo: WebGLBuffer;
-    public texture: WebGLTexture;
-    constructor(material: Material, vertices: number[], indices: number[], uvs: number[], normals: number[], texture: WebGLTexture)
+
+    constructor(meshDatas: MeshData[], indices: number[])
     {
-        this.material = material;
         this.indices = indices;
-        this.vertices = vertices;
-        this.uvs = uvs;
-        this.normals = normals;
-        this.texture = texture;
         this.vao = this.createVao();
-        this.vbo = this.createVbo(this.vertices);
+        this.bind();
         this.ibo = this.createIbo(this.indices);
+        this.vbo = this.createVbo(meshDatas);
+        this.unbind();
     }
 
     private createVao(): WebGLVertexArrayObject
     {
         const gl = Renderer.instance.gl;
         const vao = gl.createVertexArray();
-        gl.bindVertexArray(vao);
         return vao;
     }
 
-    private createVbo(data: number[]): WebGLBuffer
+    private createVbo(meshDatas: MeshData[]): WebGLBuffer
     {
+        let vertexSize = 4;
+        let normalSize = 3;
+        let texCoordSize = 2;
+        let dataSize = vertexSize + normalSize + texCoordSize;
+        dataSize *= Float32Array.BYTES_PER_ELEMENT;
+        const dv = new DataView(new ArrayBuffer(dataSize * meshDatas.length));
+        let offset = 0;
+        for (let i = 0; i < meshDatas.length; i++)
+        {
+            let meshData = meshDatas[i];
+            for (let i = 0; i < meshData.vertices.length; i++)
+            {
+                dv.setFloat32(offset, meshData.vertices[i], true);
+                offset += Float32Array.BYTES_PER_ELEMENT;
+            }
+            for (let i = 0; i < meshData.normals.length; i++)
+            {
+                dv.setFloat32(offset, meshData.normals[i], true);
+                offset += Float32Array.BYTES_PER_ELEMENT;
+            }
+            for (let i = 0; i < meshData.texCoords.length; i++)
+            {
+                dv.setFloat32(offset, meshData.texCoords[i], true);
+                offset += Float32Array.BYTES_PER_ELEMENT;           
+            }
+        }
+
         const gl = Renderer.instance.gl;
         const vbo = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, dv, gl.STATIC_DRAW);
+
+        gl.vertexAttribPointer(0, vertexSize, gl.FLOAT, false, dataSize, 0);
+        gl.vertexAttribPointer(1, normalSize, gl.FLOAT, false, dataSize, vertexSize * Float32Array.BYTES_PER_ELEMENT);
+        gl.vertexAttribPointer(2, texCoordSize, gl.FLOAT, false, dataSize, (vertexSize + normalSize) * Float32Array.BYTES_PER_ELEMENT);
+        gl.enableVertexAttribArray(0);
+        gl.enableVertexAttribArray(1);
+        gl.enableVertexAttribArray(2);
         return vbo;
     }
 
@@ -56,7 +89,11 @@ export class Mesh
     {
         const gl = Renderer.instance.gl;
         gl.bindVertexArray(this.vao);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
+    }
+
+    public unbind(): void
+    {
+        const gl = Renderer.instance.gl;
+        gl.bindVertexArray(null);
     }
 }

@@ -12,9 +12,9 @@ var _Mat = require("./mathLib/Mat4");
 
 var _Util = require("./mathLib/Util");
 
-var _Renderer = require("./renderer/Renderer");
+var _Mesh = require("./renderer/Mesh");
 
-var _ShaderProgram = require("./ShaderProgram");
+var _Renderer = require("./renderer/Renderer");
 
 var _ShaderSources = require("./ShaderSources");
 
@@ -44,11 +44,9 @@ var Program = exports.Program = function () {
             this._textContext = this._textCanvas.getContext("2d");
             this._buffers = {};
             this._shaders = {};
-            this._shaders.phong = new _ShaderProgram.ShaderProgram();
-            this._shaders.phong.initShaderProgram(gl, _ShaderSources.vsPhongSource, _ShaderSources.fsPhongSource);
-            this._shaders.quad = new _ShaderProgram.ShaderProgram();
-            this._shaders.quad.initShaderProgram(gl, _ShaderSources.vsFrameBufferSource, _ShaderSources.fsFrameBufferSource);
-            this.createCubebuffer();
+            this._shaders.phong = _Renderer.Renderer.instance.loadShader("phong", _ShaderSources.vsPhongSource, _ShaderSources.fsPhongSource);
+            this._shaders.quad = _Renderer.Renderer.instance.loadShader("quad", _ShaderSources.vsFrameBufferSource, _ShaderSources.fsFrameBufferSource);
+            this._cubeMesh = new _Mesh.Mesh([{ vertices: [-0.5, -0.5, 0.5, 1], normals: [0, 0, 1], texCoords: [0, 0] }, { vertices: [0.5, -0.5, 0.5, 1], normals: [0, 0, 1], texCoords: [1, 0] }, { vertices: [0.5, 0.5, 0.5, 1], normals: [0, 0, 1], texCoords: [1, 1] }, { vertices: [-0.5, 0.5, 0.5, 1], normals: [0, 0, 1], texCoords: [0, 1] }, { vertices: [-0.5, -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 0] }, { vertices: [-0.5, 0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 0] }, { vertices: [0.5, 0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 1] }, { vertices: [0.5, -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 1] }, { vertices: [-0.5, 0.5, -0.5, 1], normals: [0, -1, 0], texCoords: [0, 0] }, { vertices: [0.5, 0.5, 0.5, 1], normals: [0, -1, 0], texCoords: [1, 0] }, { vertices: [0.5, 0.5, 0.5, 1], normals: [0, -1, 0], texCoords: [1, 1] }, { vertices: [-0.5, 0.5, -0.5, 1], normals: [0, -1, 0], texCoords: [0, 1] }, { vertices: [-0.5, -0.5, -0.5, 1], normals: [0, 1, 0], texCoords: [0, 0] }, { vertices: [0.5, -0.5, -0.5, 1], normals: [0, 1, 0], texCoords: [1, 0] }, { vertices: [0.5, -0.5, 0.5, 1], normals: [0, 1, 0], texCoords: [1, 1] }, { vertices: [-0.5, -0.5, 0.5, 1], normals: [0, 1, 0], texCoords: [0, 1] }, { vertices: [0.5, -0.5, -0.5, 1], normals: [1, 0, 0], texCoords: [0, 0] }, { vertices: [0.5, 0.5, -0.5, 1], normals: [1, 0, 0], texCoords: [1, 0] }, { vertices: [0.5, 0.5, 0.5, 1], normals: [1, 0, 0], texCoords: [1, 1] }, { vertices: [0.5, -0.5, 0.5, 1], normals: [1, 0, 0], texCoords: [0, 1] }, { vertices: [-0.5, -0.5, -0.5, 1], normals: [-1, 0, 0], texCoords: [0, 0] }, { vertices: [-0.5, -0.5, 0.5, 1], normals: [-1, 0, 0], texCoords: [1, 0] }, { vertices: [-0.5, 0.5, 0.5, 1], normals: [-1, 0, 0], texCoords: [1, 1] }, { vertices: [-0.5, 0.5, -0.5, 1], normals: [-1, 0, 0], texCoords: [0, 1] }], [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23]);
             this.createQuadbuffer();
             var canvas = _Renderer.Renderer.instance.canvas;
             this.createFramebuffer(canvas.width, canvas.height);
@@ -143,32 +141,6 @@ var Program = exports.Program = function () {
             return (value & value - 1) === 0;
         }
     }, {
-        key: "createCubebuffer",
-        value: function createCubebuffer() {
-            var gl = _Renderer.Renderer.instance.gl;
-            {
-                var cubeVertexPositionBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer);
-                var vertices = [-0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, -0.5];
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-                this._buffers.cubeVertexPositionBuffer = cubeVertexPositionBuffer;
-            }
-            {
-                var cubeVertexTextureCoordBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexTextureCoordBuffer);
-                var textureCoordinates = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
-                this._buffers.cubeVertexTextureCoordBuffer = cubeVertexTextureCoordBuffer;
-            }
-            {
-                var cubeIndexBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
-                var cubeVertexIndices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23];
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cubeVertexIndices), gl.STATIC_DRAW);
-                this._buffers.cubeVertexIndexBuffer = cubeIndexBuffer;
-            }
-        }
-    }, {
         key: "createQuadbuffer",
         value: function createQuadbuffer() {
             var gl = _Renderer.Renderer.instance.gl;
@@ -254,31 +226,9 @@ var Program = exports.Program = function () {
             gl.enable(gl.DEPTH_TEST);
             gl.depthFunc(gl.LEQUAL);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.useProgram(this._shaders.phong.program);
+            this._cubeMesh.bind();
             {
-                var size = 3;
-                var type = gl.FLOAT;
-                var normalize = false;
-                var stride = 0;
-                var _offset = 0;
-                var positionLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_position');
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexPositionBuffer);
-                gl.vertexAttribPointer(positionLocation, size, type, normalize, stride, _offset);
-                gl.enableVertexAttribArray(positionLocation);
-            }
-            {
-                var num = 2;
-                var _type = gl.FLOAT;
-                var _normalize = false;
-                var _stride = 0;
-                var _offset2 = 0;
-                var textureLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_textureCoord');
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexTextureCoordBuffer);
-                gl.vertexAttribPointer(textureLocation, num, _type, _normalize, _stride, _offset2);
-                gl.enableVertexAttribArray(textureLocation);
-            }
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._buffers.cubeVertexIndexBuffer);
-            {
-                gl.useProgram(this._shaders.phong.program);
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, this._texture);
                 var sampler = gl.getUniformLocation(this._shaders.phong.program, 'u_sampler');
@@ -303,6 +253,7 @@ var Program = exports.Program = function () {
             var offset = 0;
             var count = 36;
             gl.drawElements(primitiveType, count, gl.UNSIGNED_SHORT, offset);
+            this._cubeMesh.unbind();
             modelViewMatrix.translate(1, 0, 0);
             gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
             gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
@@ -313,7 +264,7 @@ var Program = exports.Program = function () {
     return Program;
 }();
 
-},{"./ShaderProgram":2,"./ShaderSources":3,"./mathLib/Mat4":5,"./mathLib/Util":6,"./renderer/Renderer":7}],2:[function(require,module,exports){
+},{"./ShaderSources":3,"./mathLib/Mat4":5,"./mathLib/Util":6,"./renderer/Mesh":7,"./renderer/Renderer":8}],2:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -378,6 +329,7 @@ var ShaderProgram = exports.ShaderProgram = function () {
         key: "setUniformMatrix4fv",
         value: function setUniformMatrix4fv(name, value) {
             var gl = _Renderer.Renderer.instance.gl;
+            this.use();
             var location = this.getUniformLocation(name);
             gl.uniformMatrix4fv(location, false, value);
             this._uniforms[name] = location;
@@ -400,13 +352,13 @@ var ShaderProgram = exports.ShaderProgram = function () {
     return ShaderProgram;
 }();
 
-},{"./renderer/Renderer":7}],3:[function(require,module,exports){
+},{"./renderer/Renderer":8}],3:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-var vsPhongSource = exports.vsPhongSource = "#version 300 es\n    in vec4 a_position;\n    in vec2 a_textureCoord;\n    uniform mat4 u_projectionMatrix;\n    uniform mat4 u_modelViewMatrix;\n\n    out vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
+var vsPhongSource = exports.vsPhongSource = "#version 300 es\n    in vec4 a_position;\n    in vec3 a_normal;\n    in vec2 a_textureCoord;\n    uniform mat4 u_projectionMatrix;\n    uniform mat4 u_modelViewMatrix;\n\n    out vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
 var fsPhongSource = exports.fsPhongSource = "#version 300 es\n    precision highp float;\n    in vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n    out vec4 out_color;\n\n    void main()\n    {\n        out_color = texture(u_sampler, v_textureCoord);\n    }\n";
 var vsFrameBufferSource = exports.vsFrameBufferSource = "#version 300 es\n    in vec4 a_position;\n    in vec2 a_textureCoord;\n\n    out vec2 v_textureCoord;\n\n    void main() {\n        gl_Position = a_position;\n        v_textureCoord = a_textureCoord;\n    }\n";
 var fsFrameBufferSource = exports.fsFrameBufferSource = "#version 300 es\n    precision highp float;\n    in vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n    out vec4 out_color;\n\n    void main()\n    {\n        highp vec4 color = texture(u_sampler, v_textureCoord);\n        out_color = vec4(color.r, color.g, color.b, color.a);\n    }\n";
@@ -742,25 +694,137 @@ function degToRad(deg) {
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
+exports.Mesh = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _Renderer = require("./Renderer");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Mesh = exports.Mesh = function () {
+    function Mesh(meshDatas, indices) {
+        _classCallCheck(this, Mesh);
+
+        this.indices = indices;
+        this.vao = this.createVao();
+        this.bind();
+        this.ibo = this.createIbo(this.indices);
+        this.vbo = this.createVbo(meshDatas);
+        this.unbind();
+    }
+
+    _createClass(Mesh, [{
+        key: "createVao",
+        value: function createVao() {
+            var gl = _Renderer.Renderer.instance.gl;
+            var vao = gl.createVertexArray();
+            return vao;
+        }
+    }, {
+        key: "createVbo",
+        value: function createVbo(meshDatas) {
+            var vertexSize = 4;
+            var normalSize = 3;
+            var texCoordSize = 2;
+            var dataSize = vertexSize + normalSize + texCoordSize;
+            dataSize *= Float32Array.BYTES_PER_ELEMENT;
+            var dv = new DataView(new ArrayBuffer(dataSize * meshDatas.length));
+            var offset = 0;
+            for (var i = 0; i < meshDatas.length; i++) {
+                var meshData = meshDatas[i];
+                for (var _i = 0; _i < meshData.vertices.length; _i++) {
+                    dv.setFloat32(offset, meshData.vertices[_i], true);
+                    offset += Float32Array.BYTES_PER_ELEMENT;
+                }
+                for (var _i2 = 0; _i2 < meshData.normals.length; _i2++) {
+                    dv.setFloat32(offset, meshData.normals[_i2], true);
+                    offset += Float32Array.BYTES_PER_ELEMENT;
+                }
+                for (var _i3 = 0; _i3 < meshData.texCoords.length; _i3++) {
+                    dv.setFloat32(offset, meshData.texCoords[_i3], true);
+                    offset += Float32Array.BYTES_PER_ELEMENT;
+                }
+            }
+            var gl = _Renderer.Renderer.instance.gl;
+            var vbo = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+            gl.bufferData(gl.ARRAY_BUFFER, dv, gl.STATIC_DRAW);
+            gl.vertexAttribPointer(0, vertexSize, gl.FLOAT, false, dataSize, 0);
+            gl.vertexAttribPointer(1, normalSize, gl.FLOAT, false, dataSize, vertexSize * Float32Array.BYTES_PER_ELEMENT);
+            gl.vertexAttribPointer(2, texCoordSize, gl.FLOAT, false, dataSize, (vertexSize + normalSize) * Float32Array.BYTES_PER_ELEMENT);
+            gl.enableVertexAttribArray(0);
+            gl.enableVertexAttribArray(1);
+            gl.enableVertexAttribArray(2);
+            return vbo;
+        }
+    }, {
+        key: "createIbo",
+        value: function createIbo(data) {
+            var gl = _Renderer.Renderer.instance.gl;
+            var ibo = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(data), gl.STATIC_DRAW);
+            return ibo;
+        }
+    }, {
+        key: "bind",
+        value: function bind() {
+            var gl = _Renderer.Renderer.instance.gl;
+            gl.bindVertexArray(this.vao);
+        }
+    }, {
+        key: "unbind",
+        value: function unbind() {
+            var gl = _Renderer.Renderer.instance.gl;
+            gl.bindVertexArray(null);
+        }
+    }]);
+
+    return Mesh;
+}();
+
+},{"./Renderer":8}],8:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.Renderer = undefined;
+
+var _ShaderProgram = require("../ShaderProgram");
+
 var Renderer = exports.Renderer = undefined;
 (function (Renderer) {
     var _canvas = document.getElementById("canvas");
     var _gl = _canvas.getContext("webgl2", {
         premultipliedAlpha: false
     });
-    _canvas.width = window.innerWidth;
-    _canvas.height = window.innerHeight;
     if (!_gl) {
         alert("unable to initialise webgl");
     }
+    _canvas.width = window.innerWidth;
+    _canvas.height = window.innerHeight;
+    var _shaders = {};
     Renderer.instance = {
         get gl() {
             return _gl;
         },
         get canvas() {
             return _canvas;
+        },
+        loadShader: function loadShader(shaderName, vertexShaderSource, fragmentShaderSource) {
+            if (!_shaders[shaderName]) {
+                _shaders[shaderName] = new _ShaderProgram.ShaderProgram();
+                _shaders[shaderName].initShaderProgram(this.gl, vertexShaderSource, fragmentShaderSource);
+            }
+            return _shaders[shaderName];
+        },
+
+        get shaders() {
+            return _shaders;
         }
     };
 })(Renderer || (exports.Renderer = Renderer = {}));
 
-},{}]},{},[4])//# sourceMappingURL=bundle.js.map
+},{"../ShaderProgram":2}]},{},[4])//# sourceMappingURL=bundle.js.map

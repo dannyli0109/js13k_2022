@@ -67,6 +67,7 @@ export class ShaderProgram
     setUniformMatrix4fv(name: string, value: number[])
     {
         let gl = Renderer.instance.gl;
+        this.use();
         let location = this.getUniformLocation(name);
         gl.uniformMatrix4fv(location, false, value);
         this._uniforms[name] = location;

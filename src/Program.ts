@@ -1,5 +1,6 @@
 import { Mat4 } from "./mathLib/Mat4";
 import { degToRad } from "./mathLib/Util";
+import { Mesh } from "./renderer/Mesh";
 import { Renderer } from "./renderer/Renderer";
 import { ShaderProgram } from "./ShaderProgram";
 import { vsPhongSource, fsPhongSource, vsFrameBufferSource, fsFrameBufferSource } from "./ShaderSources";
@@ -42,6 +43,7 @@ export class Program
     private _maxFrames = 60;
     private _totalFPS = 0;
     private _fps = 0;
+    private _cubeMesh: Mesh;
     private _textTextures: TextTexture[];
 
     init()
@@ -53,13 +55,45 @@ export class Program
         this._buffers = {};
         this._shaders = {};
 
-        this._shaders.phong = new ShaderProgram();
-        this._shaders.phong.initShaderProgram(gl, vsPhongSource, fsPhongSource);
+        this._shaders.phong = Renderer.instance.loadShader("phong", vsPhongSource, fsPhongSource);
+        this._shaders.quad = Renderer.instance.loadShader("quad", vsFrameBufferSource, fsFrameBufferSource);
 
-        this._shaders.quad = new ShaderProgram();
-        this._shaders.quad.initShaderProgram(gl, vsFrameBufferSource, fsFrameBufferSource);
-
-        this.createCubebuffer();
+        this._cubeMesh = new Mesh(
+            [
+                { vertices: [-0.5, -0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [0, 0] },
+                { vertices: [ 0.5, -0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [1, 0] },
+                { vertices: [ 0.5,  0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [1, 1] },
+                { vertices: [-0.5,  0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [0, 1] },
+                { vertices: [-0.5, -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 0] },
+                { vertices: [ -0.5, 0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 0] },
+                { vertices: [ 0.5,  0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 1] },
+                { vertices: [0.5,  -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 1] },
+                { vertices: [-0.5, 0.5,  -0.5, 1], normals: [0, -1, 0], texCoords: [0, 0] },
+                { vertices: [ 0.5, 0.5,  0.5, 1], normals: [0, -1, 0], texCoords: [1, 0] },
+                { vertices: [ 0.5, 0.5, 0.5, 1], normals: [0, -1, 0], texCoords: [1, 1] },
+                { vertices: [-0.5, 0.5, -0.5, 1], normals: [0, -1, 0], texCoords: [0, 1] },
+                { vertices: [-0.5,  -0.5,  -0.5, 1], normals: [0, 1, 0], texCoords: [0, 0] },
+                { vertices: [ 0.5,  -0.5,  -0.5, 1], normals: [0, 1, 0], texCoords: [1, 0] },
+                { vertices: [ 0.5,  -0.5, 0.5, 1], normals: [0, 1, 0], texCoords: [1, 1] },
+                { vertices: [-0.5,  -0.5, 0.5, 1], normals: [0, 1, 0], texCoords: [0, 1] },
+                { vertices: [0.5, -0.5, -0.5, 1], normals: [1, 0, 0], texCoords: [0, 0] },
+                { vertices: [0.5, 0.5,  -0.5, 1], normals: [1, 0, 0], texCoords: [1, 0] },
+                { vertices: [0.5,  0.5,  0.5, 1], normals: [1, 0, 0], texCoords: [1, 1] },
+                { vertices: [0.5,  -0.5, 0.5, 1], normals: [1, 0, 0], texCoords: [0, 1] },
+                { vertices: [ -0.5, -0.5, -0.5, 1], normals: [-1, 0, 0], texCoords: [0, 0] },
+                { vertices: [ -0.5, -0.5,  0.5, 1], normals: [-1, 0, 0], texCoords: [1, 0] },
+                { vertices: [ -0.5,  0.5,  0.5, 1], normals: [-1, 0, 0], texCoords: [1, 1] },
+                { vertices: [ -0.5,  0.5, -0.5, 1], normals: [-1, 0, 0], texCoords: [0, 1] }            
+            ],
+            [
+                0, 1, 2,      0, 2, 3,    // Front face
+                4, 5, 6,      4, 6, 7,    // Back face
+                8, 9, 10,     8, 10, 11,  // Top face
+                12, 13, 14,   12, 14, 15, // Bottom face
+                16, 17, 18,   16, 18, 19, // Right face
+                20, 21, 22,   20, 22, 23  // Left face
+            ]
+        )
         this.createQuadbuffer();
         // this.createTextTextures();
         let canvas = Renderer.instance.canvas;
@@ -178,113 +212,6 @@ export class Program
       
     isPowerOf2(value: number): boolean {
         return (value & (value - 1)) === 0;
-    }
-
-    private createCubebuffer()
-    {
-        let gl = Renderer.instance.gl;
-
-        // cube vertex data
-        {
-            let cubeVertexPositionBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer);
-            let vertices = [
-                // Front face
-                -0.5, -0.5,  0.5,
-                0.5, -0.5,  0.5,
-                0.5,  0.5,  0.5,
-                -0.5,  0.5,  0.5,
-    
-                // Back face
-                -0.5, -0.5, -0.5,
-                -0.5,  0.5, -0.5,
-                0.5,  0.5, -0.5,
-                0.5, -0.5, -0.5,
-    
-                // Top face
-                -0.5,  0.5, -0.5,
-                -0.5,  0.5,  0.5,
-                0.5,  0.5,  0.5,
-                0.5,  0.5, -0.5,
-    
-                // Bottom face
-                -0.5, -0.5, -0.5,
-                0.5, -0.5, -0.5,
-                0.5, -0.5,  0.5,
-                -0.5, -0.5,  0.5,
-    
-                // Right face
-                0.5, -0.5, -0.5,
-                0.5,  0.5, -0.5,
-                0.5,  0.5,  0.5,
-                0.5, -0.5,  0.5,
-    
-                // Left face
-                -0.5, -0.5, -0.5,
-                -0.5, -0.5,  0.5,
-                -0.5,  0.5,  0.5,
-                -0.5,  0.5, -0.5
-            ]
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-            this._buffers.cubeVertexPositionBuffer = cubeVertexPositionBuffer;
-        }
-
-        // cube texture data
-        {
-            let cubeVertexTextureCoordBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexTextureCoordBuffer);
-            const textureCoordinates = [
-                // Front
-                0.0,  0.0,
-                1.0,  0.0,
-                1.0,  1.0,
-                0.0,  1.0,
-                // Back
-                0.0,  0.0,
-                1.0,  0.0,
-                1.0,  1.0,
-                0.0,  1.0,
-                // Top
-                0.0,  0.0,
-                1.0,  0.0,
-                1.0,  1.0,
-                0.0,  1.0,
-                // Bottom
-                0.0,  0.0,
-                1.0,  0.0,
-                1.0,  1.0,
-                0.0,  1.0,
-                // Right
-                0.0,  0.0,
-                1.0,  0.0,
-                1.0,  1.0,
-                0.0,  1.0,
-                // Left
-                0.0,  0.0,
-                1.0,  0.0,
-                1.0,  1.0,
-                0.0,  1.0,
-            ];
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
-            this._buffers.cubeVertexTextureCoordBuffer = cubeVertexTextureCoordBuffer;
-        }
-        
-        // cube index data
-        {
-            let cubeIndexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
-            let cubeVertexIndices = [
-                0, 1, 2,      0, 2, 3,    // Front face
-                4, 5, 6,      4, 6, 7,    // Back face
-                8, 9, 10,     8, 10, 11,  // Top face
-                12, 13, 14,   12, 14, 15, // Bottom face
-                16, 17, 18,   16, 18, 19, // Right face
-                20, 21, 22,   20, 22, 23  // Left face
-            ];
-            
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cubeVertexIndices), gl.STATIC_DRAW);
-            this._buffers.cubeVertexIndexBuffer = cubeIndexBuffer;
-        }
     }
 
     private createQuadbuffer()
@@ -447,36 +374,38 @@ export class Program
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         
-        {
-            // Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-            const size = 3;          // 3 components per iteration
-            const type = gl.FLOAT;   // the data is 32bit floats
-            const normalize = false; // don't normalize the data
-            const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-            const offset = 0;        // start at the beginning of the buffer
-            let positionLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_position');
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexPositionBuffer);
-            gl.vertexAttribPointer(positionLocation, size, type, normalize, stride, offset);
-            gl.enableVertexAttribArray(positionLocation);
-        }
+        // {
+        //     // Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
+        //     const size = 3;          // 3 components per iteration
+        //     const type = gl.FLOAT;   // the data is 32bit floats
+        //     const normalize = false; // don't normalize the data
+        //     const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+        //     const offset = 0;        // start at the beginning of the buffer
+        //     let positionLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_position');
+        //     gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexPositionBuffer);
+        //     gl.vertexAttribPointer(positionLocation, size, type, normalize, stride, offset);
+        //     gl.enableVertexAttribArray(positionLocation);
+        // }
 
-        {
-            const num = 2; // every coordinate composed of 2 values
-            const type = gl.FLOAT; // the data in the buffer is 32-bit float
-            const normalize = false; // don't normalize
-            const stride = 0; // how many bytes to get from one set to the next
-            const offset = 0; // how many bytes inside the buffer to start from
-            let textureLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_textureCoord');
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexTextureCoordBuffer);
-            gl.vertexAttribPointer(textureLocation, num, type, normalize, stride, offset);
-            gl.enableVertexAttribArray(textureLocation);
-        }
+        // {
+        //     const num = 2; // every coordinate composed of 2 values
+        //     const type = gl.FLOAT; // the data in the buffer is 32-bit float
+        //     const normalize = false; // don't normalize
+        //     const stride = 0; // how many bytes to get from one set to the next
+        //     const offset = 0; // how many bytes inside the buffer to start from
+        //     let textureLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_textureCoord');
+        //     gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexTextureCoordBuffer);
+        //     gl.vertexAttribPointer(textureLocation, num, type, normalize, stride, offset);
+        //     gl.enableVertexAttribArray(textureLocation);
+        // }
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._buffers.cubeVertexIndexBuffer);
+        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._buffers.cubeVertexIndexBuffer);
+
+        gl.useProgram(this._shaders.phong.program);
+        this._cubeMesh.bind();
 
         {
             
-            gl.useProgram(this._shaders.phong.program);
 
 
             // Tell WebGL we want to affect texture unit 0
@@ -510,8 +439,6 @@ export class Program
 
         // modelViewMatrix.translate(0, 0, -6);
 
-
-
         var projectionMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_projectionMatrix");
         var modelViewMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_modelViewMatrix");
         // Set the matrix.
@@ -525,6 +452,8 @@ export class Program
 
         // projectionMatrix = Mat4.orthographic(gl.canvas.clientWidth, gl.canvas.clientHeight, 400);
         gl.drawElements(primitiveType, count, gl.UNSIGNED_SHORT, offset);
+        this._cubeMesh.unbind();
+
         modelViewMatrix.translate(1, 0, 0);
         gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
         gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
