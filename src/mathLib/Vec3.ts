@@ -67,6 +67,18 @@ export class Vec3
         return new Vec3(this.x - other.x, this.y - other.y, this.z - other.z);
     }
 
+    public multiply(other: number | Vec3): Vec3
+    {
+        if (typeof other === "number")
+        {
+            return new Vec3(this.x * other, this.y * other, this.z * other);
+        }
+        else
+        {
+            return new Vec3(this.x * other.x, this.y * other.y, this.z * other.z);
+        }
+    }
+
     public dot(other: Vec3): number
     {
         return this.x * other.x + this.y * other.y + this.z * other.z;

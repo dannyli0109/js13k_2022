@@ -1,4 +1,4 @@
-import { Vec2 } from "Vec2"
+import type { Vec2 } from "./Vec2";
 
 /**
  * column-major 3x3 matrix class

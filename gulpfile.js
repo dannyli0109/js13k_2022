@@ -36,11 +36,7 @@ function doBrowserify() {
   const b = browserify({
     entries: "./lib/index.js",
     debug: false,
-  }).transform(
-    babelify.configure({
-      presets: ["es2015"],
-    })
-  );
+  });
   return (
     b
       .bundle()
@@ -54,11 +50,13 @@ function doBrowserify() {
 }
 
 function dist() {
-  return src("./build/*")
-    .pipe(zip("archive.zip"))
-    .pipe(size())
-    .pipe(micro({ limit: 13 * 1024 }))
-    .pipe(dest("./dist"));
+  return (
+    src("./build/*")
+      .pipe(zip("archive.zip"))
+      .pipe(size())
+      // .pipe(micro({ limit: 13 * 1024 }))
+      .pipe(dest("./dist"))
+  );
 }
 
 function moveWorkingDirectory() {
@@ -97,17 +95,25 @@ function createTsconfig(cb) {
     fs.writeFileSync(
       "./src/tsconfig.json",
       `{
-            "compilerOptions": {
-                "module": "ES2015",
-                "target": "ES2018",
-                "noImplicitAny": true,
-                "removeComments": true,
-                "preserveConstEnums": true,
-                "sourceMap": true,
-                "allowJs": true,
-                "checkJs": false
-            }
-        }`
+        "compilerOptions": {
+            "target": "ES5",
+            "module": "CommonJS",
+            "esModuleInterop": true,
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": true,
+            "allowSyntheticDefaultImports" : true,
+            "jsx" : "preserve",
+            "sourceMap" : true,
+            "removeComments": true,
+            "preserveConstEnums": true,
+            "allowJs": true,
+            "checkJs": false,
+            "lib": [
+                "es6",
+                "dom"
+            ]
+        }
+    }`
     );
   }
   cb();
@@ -152,8 +158,8 @@ exports.build = series(
   buildHtml,
   buildStyles,
   buildTs,
-  doBrowserify
-  // dist
+  doBrowserify,
+  dist
 );
 
 exports.default = series(

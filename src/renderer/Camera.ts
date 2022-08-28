@@ -1,3 +1,4 @@
+import { Input, Keycode, MouseButton } from "../gameplay/Input";
 import { Mat4 } from "../mathLib/Mat4";
 import { degToRad } from "../mathLib/Util";
 import { Vec3 } from "../mathLib/Vec3";
@@ -11,6 +12,14 @@ const ZOOM        =  45.0;
 const NEAR        =  0.1;
 const FAR         =  1000.0;
 const FOV         =  60;
+
+export enum CameraMovement
+{
+    FORWARD,
+    BACKWARD,
+    LEFT,
+    RIGHT
+}
 
 export abstract class Camera
 {
@@ -35,12 +44,13 @@ export class EditorPerspectiveCamera extends Camera
     private _near: number;
     private _far: number;
 
+    private _moveDir: Vec3;
     private _movementSpeed: number;
     private _mouseSensitivity: number;
     private _zoom: number;
 
     constructor(
-        position: Vec3 = new Vec3(), 
+        position: Vec3 = new Vec3(0, 0, 0), 
         up: Vec3 = new Vec3(0, 1, 0),
         yaw: number = YAW, 
         pitch: number = PITCH, 
@@ -68,6 +78,17 @@ export class EditorPerspectiveCamera extends Camera
         this._mouseSensitivity = mouseSensitivity;
         this._zoom = zoom;
         this.updateVectors();
+
+        this._moveDir = new Vec3(0, 0, 0);
+
+        Input.instance.onMouseMove((e) => {
+            if (Input.instance.isMouseDown(MouseButton.Right)) {
+                let xDelta = e.movementX;
+                let yDelta = -e.movementY;
+                this.processMouseMovement(xDelta, yDelta);
+            }
+        })
+        
     }
 
     public get viewMatrix(): Mat4 {
@@ -80,7 +101,6 @@ export class EditorPerspectiveCamera extends Camera
         return Mat4.perspective(degToRad(this._fov), aspect, this._near, this._far);
     }
 
-
     private updateVectors(): void
     {
         let front: Vec3 = new Vec3();
@@ -90,5 +110,43 @@ export class EditorPerspectiveCamera extends Camera
         this._front = front.normalize();
         this._right = this._front.cross(this._worldUp).normalize();
         this._up = this._right.cross(this._front).normalize();
+    }
+
+    public processKeyboard(dir: CameraMovement, dt: number)
+    {
+        let velocity = this._movementSpeed * dt;
+        if (dir === CameraMovement.FORWARD) {
+            this._position = this._position.add(this._front.multiply(velocity));
+        } 
+        if (dir === CameraMovement.BACKWARD) {
+            this._position = this._position.subtract(this._front.multiply(velocity));
+        }
+        if (dir === CameraMovement.LEFT) {
+            this._position = this._position.subtract(this._right.multiply(velocity));
+        }
+        if (dir === CameraMovement.RIGHT) {
+            this._position = this._position.add(this._right.multiply(velocity));
+        }
+    }
+
+    public processMouseMovement(xoffset: number, yoffset: number, constrainPitch: boolean = true)
+    {
+        xoffset *= this._mouseSensitivity;
+        yoffset *= this._mouseSensitivity;
+
+        this._yaw += xoffset;
+        this._pitch += yoffset;
+
+        // make sure that when pitch is out of bounds, screen doesn't get flipped
+        if (constrainPitch)
+        {
+            if (this._pitch > 89.0)
+                this._pitch = 89.0;
+            if (this._pitch < -89.0)
+                this._pitch = -89.0;
+        }
+
+        // update Front, Right and Up Vectors using the updated Euler angles
+        this.updateVectors();
     }
 }

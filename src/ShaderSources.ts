@@ -3,12 +3,13 @@ export const vsPhongSource = `#version 300 es
     in vec3 a_normal;
     in vec2 a_textureCoord;
     uniform mat4 u_projectionMatrix;
-    uniform mat4 u_modelViewMatrix;
+    uniform mat4 u_modelMatrix;
+    uniform mat4 u_viewMatrix;
 
     out vec2 v_textureCoord;
 
     void main() {
-        gl_Position = u_projectionMatrix * u_modelViewMatrix * a_position;
+        gl_Position = u_projectionMatrix * u_viewMatrix * u_modelMatrix * a_position;
         v_textureCoord = a_textureCoord;
     }
 `;
@@ -21,7 +22,9 @@ export const fsPhongSource = `#version 300 es
 
     void main()
     {
-        out_color = texture(u_sampler, v_textureCoord);
+        highp vec4 color = texture(u_sampler, v_textureCoord);
+        if (color.a == 0.0) { discard; }
+        out_color = color;
     }
 `;
 

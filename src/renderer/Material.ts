@@ -1,5 +1,5 @@
-import { ShaderProgram } from "../ShaderProgram";
-import { Texture } from "./Texture";
+import type { ShaderProgram } from "../ShaderProgram";
+import type { Texture } from "./Texture";
 
 
 

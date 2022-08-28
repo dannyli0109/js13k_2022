@@ -1,8 +1,10 @@
+import { Input, Keycode } from "./gameplay/Input";
 import { Mat4 } from "./mathLib/Mat4";
 import { degToRad } from "./mathLib/Util";
+import { Camera, CameraMovement } from "./renderer/Camera";
 import { Mesh } from "./renderer/Mesh";
 import { Renderer } from "./renderer/Renderer";
-import { ShaderProgram } from "./ShaderProgram";
+import type { ShaderProgram } from "./ShaderProgram";
 import { vsPhongSource, fsPhongSource, vsFrameBufferSource, fsFrameBufferSource } from "./ShaderSources";
 
 
@@ -49,7 +51,11 @@ export class Program
     init()
     {
         let gl = Renderer.instance.gl;
-        
+        let a  = Input.instance.onKey(Keycode.W, this.onKeyDown.bind(this));
+        a.disconnect();
+        // Input.instance.off(Keycode.W, this.onKeyDown.bind(this));
+        // InputManager.instance.off(Keycode.W, this.onKeyDown);
+
         this._textCanvas = document.getElementById("textCanvas") as HTMLCanvasElement;
         this._textContext = this._textCanvas.getContext("2d");
         this._buffers = {};
@@ -65,13 +71,13 @@ export class Program
                 { vertices: [ 0.5,  0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [1, 1] },
                 { vertices: [-0.5,  0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [0, 1] },
                 { vertices: [-0.5, -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 0] },
-                { vertices: [ -0.5, 0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 0] },
+                { vertices: [ 0.5, -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 0] },
                 { vertices: [ 0.5,  0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 1] },
-                { vertices: [0.5,  -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 1] },
+                { vertices: [-0.5,  0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 1] },
                 { vertices: [-0.5, 0.5,  -0.5, 1], normals: [0, -1, 0], texCoords: [0, 0] },
-                { vertices: [ 0.5, 0.5,  0.5, 1], normals: [0, -1, 0], texCoords: [1, 0] },
+                { vertices: [ 0.5, 0.5,  -0.5, 1], normals: [0, -1, 0], texCoords: [1, 0] },
                 { vertices: [ 0.5, 0.5, 0.5, 1], normals: [0, -1, 0], texCoords: [1, 1] },
-                { vertices: [-0.5, 0.5, -0.5, 1], normals: [0, -1, 0], texCoords: [0, 1] },
+                { vertices: [-0.5, 0.5, 0.5, 1], normals: [0, -1, 0], texCoords: [0, 1] },
                 { vertices: [-0.5,  -0.5,  -0.5, 1], normals: [0, 1, 0], texCoords: [0, 0] },
                 { vertices: [ 0.5,  -0.5,  -0.5, 1], normals: [0, 1, 0], texCoords: [1, 0] },
                 { vertices: [ 0.5,  -0.5, 0.5, 1], normals: [0, 1, 0], texCoords: [1, 1] },
@@ -81,9 +87,9 @@ export class Program
                 { vertices: [0.5,  0.5,  0.5, 1], normals: [1, 0, 0], texCoords: [1, 1] },
                 { vertices: [0.5,  -0.5, 0.5, 1], normals: [1, 0, 0], texCoords: [0, 1] },
                 { vertices: [ -0.5, -0.5, -0.5, 1], normals: [-1, 0, 0], texCoords: [0, 0] },
-                { vertices: [ -0.5, -0.5,  0.5, 1], normals: [-1, 0, 0], texCoords: [1, 0] },
+                { vertices: [ -0.5, 0.5,  -0.5, 1], normals: [-1, 0, 0], texCoords: [1, 0] },
                 { vertices: [ -0.5,  0.5,  0.5, 1], normals: [-1, 0, 0], texCoords: [1, 1] },
-                { vertices: [ -0.5,  0.5, -0.5, 1], normals: [-1, 0, 0], texCoords: [0, 1] }            
+                { vertices: [ -0.5,  -0.5, 0.5, 1], normals: [-1, 0, 0], texCoords: [0, 1] }            
             ],
             [
                 0, 1, 2,      0, 2, 3,    // Front face
@@ -105,8 +111,18 @@ export class Program
         this.onCanvasResize();
         
         this._texture = this.loadTexture("./working/tile000.png");
+        // this._texture = this.loadTexture("./working/keyboard.jpg");
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.enable(gl.BLEND);
+        gl.enable(gl.DEPTH_TEST); // Enable depth testing
+    
+        // gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    }
+
+    onKeyDown() 
+    {
+        console.log("keydown");
     }
     
     private onCanvasResize()
@@ -116,6 +132,15 @@ export class Program
         canvas.height = window.innerHeight;
         canvas.width = window.innerWidth;
         this.createFramebuffer(gl.canvas.width, gl.canvas.height);
+    }
+
+    processInput(dt: number)
+    {
+        let editorCamera = Renderer.instance.editorCamera;
+        if (Input.instance.isKeyDown(Keycode.W)) editorCamera.processKeyboard(CameraMovement.FORWARD, dt);
+        if (Input.instance.isKeyDown(Keycode.S)) editorCamera.processKeyboard(CameraMovement.BACKWARD, dt);
+        if (Input.instance.isKeyDown(Keycode.A)) editorCamera.processKeyboard(CameraMovement.LEFT, dt);
+        if (Input.instance.isKeyDown(Keycode.D)) editorCamera.processKeyboard(CameraMovement.RIGHT, dt); 
     }
     
     update()
@@ -138,11 +163,13 @@ export class Program
             this._fps = 1000 / this._elapsed;
         }
         this._then = now;
+        let dt = this._elapsed / 1000;
+        this.processInput(dt);
         
         this._textContext.clearRect(0, 0, this._textCanvas.width, this._textCanvas.height);
         this._textContext.fillText("FPS: " + this.getFps().toFixed(1), 10, 10);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
-        this.drawScene(this._elapsed / 1000);
+        this.drawScene(dt);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
         this.drawQuad();
@@ -163,50 +190,22 @@ export class Program
 
     }
 
-    loadTexture(url: string): WebGLTexture{
+    loadTexture(url: string)
+    {
         let gl = Renderer.instance.gl;
-        const texture = gl.createTexture();
+        let texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
-      
-        // Because images have to be downloaded over the internet
-        // they might take a moment until they are ready.
-        // Until then put a single pixel in the texture so we can
-        // use it immediately. When the image has finished downloading
-        // we'll update the texture with the contents of the image.
-        const level = 0;
-        const internalFormat = gl.RGBA;
-        const width = 1;
-        const height = 1;
-        const border = 0;
-        const srcFormat = gl.RGBA;
-        const srcType = gl.UNSIGNED_BYTE;
-        const pixel = new Uint8Array([0, 0, 255, 255]);  // opaque blue
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-                      width, height, border, srcFormat, srcType,
-                      pixel);
-      
-        const image = new Image();
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+        let image = new Image();
         image.onload = () => {
-          gl.bindTexture(gl.TEXTURE_2D, texture);
-          gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-                        srcFormat, srcType, image);
-      
-          // WebGL1 has different requirements for power of 2 images
-          // vs non power of 2 images so check if the image is a
-          // power of 2 in both dimensions.
-          if (this.isPowerOf2(image.width) && this.isPowerOf2(image.height)) {
-             // Yes, it's a power of 2. Generate mips.
-             gl.generateMipmap(gl.TEXTURE_2D);
-          } else {
-             // No, it's not a power of 2. Turn off mips and set
-             // wrapping to clamp to edge
-             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-          }
-        };
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+        }
         image.src = url;
-      
         return texture;
     }
       
@@ -300,7 +299,7 @@ export class Program
         let gl = Renderer.instance.gl;
         gl.useProgram(this._shaders.quad.program);
         gl.viewport(0, 0,  gl.canvas.width, gl.canvas.height);
-        gl.clearColor(1, 0, 0, 1);
+        gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
         let positionLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_position');
         gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadPositionBuffer);
@@ -362,52 +361,14 @@ export class Program
         let speed = 60 * deltaTime;
         // Tell WebGL how to convert from clip space to pixels
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.clearColor(0, 1, 1, 1);
-        gl.enable(gl.BLEND);
-        // gl.colorMask(false, false, false, true);
-        gl.clearDepth(1); // Clear everything
-        // gl.enable(gl.CULL_FACE);
-        // gl.cullFace(gl.FRONT_AND_BACK);
-        gl.enable(gl.DEPTH_TEST); // Enable depth testing
-        gl.depthFunc(gl.LEQUAL); // Near things obscure far things
+        gl.clearDepth(1); // Cl
+        gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        
-        // {
-        //     // Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-        //     const size = 3;          // 3 components per iteration
-        //     const type = gl.FLOAT;   // the data is 32bit floats
-        //     const normalize = false; // don't normalize the data
-        //     const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-        //     const offset = 0;        // start at the beginning of the buffer
-        //     let positionLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_position');
-        //     gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexPositionBuffer);
-        //     gl.vertexAttribPointer(positionLocation, size, type, normalize, stride, offset);
-        //     gl.enableVertexAttribArray(positionLocation);
-        // }
-
-        // {
-        //     const num = 2; // every coordinate composed of 2 values
-        //     const type = gl.FLOAT; // the data in the buffer is 32-bit float
-        //     const normalize = false; // don't normalize
-        //     const stride = 0; // how many bytes to get from one set to the next
-        //     const offset = 0; // how many bytes inside the buffer to start from
-        //     let textureLocation = gl.getAttribLocation(this._shaders.phong.program, 'a_textureCoord');
-        //     gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.cubeVertexTextureCoordBuffer);
-        //     gl.vertexAttribPointer(textureLocation, num, type, normalize, stride, offset);
-        //     gl.enableVertexAttribArray(textureLocation);
-        // }
-
-        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._buffers.cubeVertexIndexBuffer);
 
         gl.useProgram(this._shaders.phong.program);
         this._cubeMesh.bind();
 
         {
-            
-
-
             // Tell WebGL we want to affect texture unit 0
             gl.activeTexture(gl.TEXTURE0);
 
@@ -416,10 +377,19 @@ export class Program
             let sampler = gl.getUniformLocation(this._shaders.phong.program, 'u_sampler');
             
             // Tell the shader we bound the texture to texture unit 0
-            
             gl.uniform1i(sampler, 0);
         }
         
+        
+        // let projectionMatrix = Mat4.orthographic(gl.canvas.clientWidth, gl.canvas.clientHeight, 400);
+        let modelMatrix = new Mat4();
+        modelMatrix.translate(0, 0, -6);
+        modelMatrix.scale(0.5, 0.5, 0.5);
+        modelMatrix.rotateX(degToRad(this._cubeRotation));
+        modelMatrix.rotateY(degToRad(this._cubeRotation));
+        modelMatrix.rotateZ(degToRad(this._cubeRotation));
+        
+        // modelMatrix.translate(0, 0, -6);
         
         const fieldOfView = degToRad(45);   // in radians
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
@@ -428,22 +398,16 @@ export class Program
 
         // Compute the matrices
 
-        let projectionMatrix = Mat4.perspective(fieldOfView, aspect, zNear, zFar);
-        // let projectionMatrix = Mat4.orthographic(gl.canvas.clientWidth, gl.canvas.clientHeight, 400);
-        let modelViewMatrix = new Mat4();
-        modelViewMatrix.translate(0, 0, -6);
-        modelViewMatrix.scale(0.5, 0.5, 0.5);
-        modelViewMatrix.rotateX(degToRad(this._cubeRotation));
-        modelViewMatrix.rotateY(degToRad(this._cubeRotation));
-        modelViewMatrix.rotateZ(degToRad(this._cubeRotation));
-
-        // modelViewMatrix.translate(0, 0, -6);
-
+        // let projectionMatrix = Mat4.perspective(fieldOfView, aspect, zNear, zFar);
         var projectionMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_projectionMatrix");
-        var modelViewMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_modelViewMatrix");
+        var modelMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_modelMatrix");
+        var viewMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_viewMatrix");
+
         // Set the matrix.
-        gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
-        gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
+        // Renderer.instance.editorCamera.projectionMatrix.values
+        gl.uniformMatrix4fv(projectionMatrixLocation, false, Renderer.instance.editorCamera.projectionMatrix.values);
+        gl.uniformMatrix4fv(viewMatrixLocation, false, Renderer.instance.editorCamera.viewMatrix.values);
+        gl.uniformMatrix4fv(modelMatrixLocation, false, modelMatrix.values);
     
         // Draw the geometry.
         var primitiveType = gl.TRIANGLES;
@@ -453,10 +417,7 @@ export class Program
         // projectionMatrix = Mat4.orthographic(gl.canvas.clientWidth, gl.canvas.clientHeight, 400);
         gl.drawElements(primitiveType, count, gl.UNSIGNED_SHORT, offset);
         this._cubeMesh.unbind();
-
-        modelViewMatrix.translate(1, 0, 0);
-        gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix.values);
-        gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix.values);
+        gl.bindTexture(gl.TEXTURE_2D, null);
         this._cubeRotation += speed;
       }
 }

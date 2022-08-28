@@ -1,6 +1,6 @@
-import { Mat4 } from "../mathLib/Mat4";
-import { Camera } from "./Camera";
-import { Mesh } from "./Mesh";
+import type { Mat4 } from "../mathLib/Mat4";
+// import { Camera } from "./Camera";
+import type { Mesh } from "./Mesh";
 
 export class MeshRenderer
 {
