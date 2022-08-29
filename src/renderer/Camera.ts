@@ -4,33 +4,29 @@ import { degToRad } from "../mathLib/Util";
 import { Vec3 } from "../mathLib/Vec3";
 import { Renderer } from "./Renderer";
 
-const YAW         = -90.0;
-const PITCH       =  0.0;
-const SPEED       =  2.5;
-const SENSITIVITY =  0.1;
-const ZOOM        =  45.0;
-const NEAR        =  0.1;
-const FAR         =  1000.0;
-const FOV         =  60;
+const YAW = -90.0;
+const PITCH = 0.0;
+const SPEED = 2.5;
+const SENSITIVITY = 0.1;
+const ZOOM = 45.0;
+const NEAR = 0.1;
+const FAR = 1000.0;
+const FOV = 60;
 
-export enum CameraMovement
-{
+export enum CameraMovement {
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
 }
 
-export abstract class Camera
-{
+export abstract class Camera {
     public abstract get viewMatrix(): Mat4;
 
     public abstract get projectionMatrix(): Mat4;
 }
 
-export class EditorPerspectiveCamera extends Camera
-{
-
+export class EditorPerspectiveCamera extends Camera {
     private _position: Vec3;
     private _front: Vec3;
     private _up: Vec3;
@@ -44,25 +40,23 @@ export class EditorPerspectiveCamera extends Camera
     private _near: number;
     private _far: number;
 
-    private _moveDir: Vec3;
     private _movementSpeed: number;
     private _mouseSensitivity: number;
     private _zoom: number;
 
     constructor(
-        position: Vec3 = new Vec3(0, 0, 0), 
+        position: Vec3 = new Vec3(0, 0, 0),
         up: Vec3 = new Vec3(0, 1, 0),
-        yaw: number = YAW, 
-        pitch: number = PITCH, 
-        front: Vec3 =  new Vec3(0, 0, -1), 
+        yaw: number = YAW,
+        pitch: number = PITCH,
+        front: Vec3 = new Vec3(0, 0, -1),
         fov: number = FOV,
         near: number = NEAR,
         far: number = FAR,
-        movementSpeed: number = SPEED, 
+        movementSpeed: number = SPEED,
         mouseSensitivity: number = SENSITIVITY,
         zoom: number = ZOOM
-    )
-    {
+    ) {
         super();
         this._position = position;
         this._front = front;
@@ -79,16 +73,13 @@ export class EditorPerspectiveCamera extends Camera
         this._zoom = zoom;
         this.updateVectors();
 
-        this._moveDir = new Vec3(0, 0, 0);
-
-        Input.instance.onMouseMove((e) => {
+        Input.instance.onMouseMove(e => {
             if (Input.instance.isMouseDown(MouseButton.Right)) {
                 let xDelta = e.movementX;
                 let yDelta = -e.movementY;
                 this.processMouseMovement(xDelta, yDelta);
             }
-        })
-        
+        });
     }
 
     public get viewMatrix(): Mat4 {
@@ -101,8 +92,7 @@ export class EditorPerspectiveCamera extends Camera
         return Mat4.perspective(degToRad(this._fov), aspect, this._near, this._far);
     }
 
-    private updateVectors(): void
-    {
+    private updateVectors(): void {
         let front: Vec3 = new Vec3();
         front.x = Math.cos(degToRad(this._yaw)) * Math.cos(degToRad(this._pitch));
         front.y = Math.sin(degToRad(this._pitch));
@@ -112,12 +102,11 @@ export class EditorPerspectiveCamera extends Camera
         this._up = this._right.cross(this._front).normalize();
     }
 
-    public processKeyboard(dir: CameraMovement, dt: number)
-    {
+    public processKeyboard(dir: CameraMovement, dt: number) {
         let velocity = this._movementSpeed * dt;
         if (dir === CameraMovement.FORWARD) {
             this._position = this._position.add(this._front.multiply(velocity));
-        } 
+        }
         if (dir === CameraMovement.BACKWARD) {
             this._position = this._position.subtract(this._front.multiply(velocity));
         }
@@ -129,8 +118,7 @@ export class EditorPerspectiveCamera extends Camera
         }
     }
 
-    public processMouseMovement(xoffset: number, yoffset: number, constrainPitch: boolean = true)
-    {
+    public processMouseMovement(xoffset: number, yoffset: number, constrainPitch: boolean = true) {
         xoffset *= this._mouseSensitivity;
         yoffset *= this._mouseSensitivity;
 
@@ -138,12 +126,9 @@ export class EditorPerspectiveCamera extends Camera
         this._pitch += yoffset;
 
         // make sure that when pitch is out of bounds, screen doesn't get flipped
-        if (constrainPitch)
-        {
-            if (this._pitch > 89.0)
-                this._pitch = 89.0;
-            if (this._pitch < -89.0)
-                this._pitch = -89.0;
+        if (constrainPitch) {
+            if (this._pitch > 89.0) this._pitch = 89.0;
+            if (this._pitch < -89.0) this._pitch = -89.0;
         }
 
         // update Front, Right and Up Vectors using the updated Euler angles

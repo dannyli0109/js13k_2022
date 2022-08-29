@@ -2,32 +2,61 @@ import { Input, Keycode } from "./gameplay/Input";
 import { Mat4 } from "./mathLib/Mat4";
 import { degToRad } from "./mathLib/Util";
 import { Camera, CameraMovement } from "./renderer/Camera";
-import { Mesh } from "./renderer/Mesh";
+import { Mesh, MeshData } from "./renderer/Mesh";
+import { CubeMeshData, QuadMeshData } from "./renderer/MeshData";
 import { Renderer } from "./renderer/Renderer";
-import type { ShaderProgram } from "./ShaderProgram";
-import { vsPhongSource, fsPhongSource, vsFrameBufferSource, fsFrameBufferSource } from "./ShaderSources";
+import type { ShaderProgram } from "./renderer/ShaderProgram";
+import {
+    vsPhongSource,
+    fsPhongSource,
+    vsFrameBufferSource,
+    fsFrameBufferSource,
+} from "./renderer/ShaderSources";
 
-
-type Buffers = { 
+type Buffers = {
     [bufferName: string]: WebGLBuffer;
-}
+};
 
 type Shaders = {
     [shaderName: string]: ShaderProgram;
-}
+};
 
 type TextTexture = {
-    texture: WebGLTexture,
-    width: number,
-    height: number
-}
+    texture: WebGLTexture;
+    width: number;
+    height: number;
+};
 
 const alphabets = [
-    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z",
 ];
 
-export class Program
-{
+export class Program {
     // private _canvas: HTMLCanvasElement;
     private _textCanvas: HTMLCanvasElement;
     private _textContext: CanvasRenderingContext2D;
@@ -46,12 +75,12 @@ export class Program
     private _totalFPS = 0;
     private _fps = 0;
     private _cubeMesh: Mesh;
+    private _quadMesh: Mesh;
     private _textTextures: TextTexture[];
 
-    init()
-    {
+    init() {
         let gl = Renderer.instance.gl;
-        let a  = Input.instance.onKey(Keycode.W, this.onKeyDown.bind(this));
+        let a = Input.instance.onKey(Keycode.W, this.onKeyDown.bind(this));
         a.disconnect();
         // Input.instance.off(Keycode.W, this.onKeyDown.bind(this));
         // InputManager.instance.off(Keycode.W, this.onKeyDown);
@@ -62,71 +91,44 @@ export class Program
         this._shaders = {};
 
         this._shaders.phong = Renderer.instance.loadShader("phong", vsPhongSource, fsPhongSource);
-        this._shaders.quad = Renderer.instance.loadShader("quad", vsFrameBufferSource, fsFrameBufferSource);
+        this._shaders.quad = Renderer.instance.loadShader(
+            "quad",
+            vsFrameBufferSource,
+            fsFrameBufferSource
+        );
 
         this._cubeMesh = new Mesh(
-            [
-                { vertices: [-0.5, -0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [0, 0] },
-                { vertices: [ 0.5, -0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [1, 0] },
-                { vertices: [ 0.5,  0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [1, 1] },
-                { vertices: [-0.5,  0.5,  0.5, 1], normals: [0, 0, 1], texCoords: [0, 1] },
-                { vertices: [-0.5, -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 0] },
-                { vertices: [ 0.5, -0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 0] },
-                { vertices: [ 0.5,  0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [1, 1] },
-                { vertices: [-0.5,  0.5, -0.5, 1], normals: [0, 0, -1], texCoords: [0, 1] },
-                { vertices: [-0.5, 0.5,  -0.5, 1], normals: [0, -1, 0], texCoords: [0, 0] },
-                { vertices: [ 0.5, 0.5,  -0.5, 1], normals: [0, -1, 0], texCoords: [1, 0] },
-                { vertices: [ 0.5, 0.5, 0.5, 1], normals: [0, -1, 0], texCoords: [1, 1] },
-                { vertices: [-0.5, 0.5, 0.5, 1], normals: [0, -1, 0], texCoords: [0, 1] },
-                { vertices: [-0.5,  -0.5,  -0.5, 1], normals: [0, 1, 0], texCoords: [0, 0] },
-                { vertices: [ 0.5,  -0.5,  -0.5, 1], normals: [0, 1, 0], texCoords: [1, 0] },
-                { vertices: [ 0.5,  -0.5, 0.5, 1], normals: [0, 1, 0], texCoords: [1, 1] },
-                { vertices: [-0.5,  -0.5, 0.5, 1], normals: [0, 1, 0], texCoords: [0, 1] },
-                { vertices: [0.5, -0.5, -0.5, 1], normals: [1, 0, 0], texCoords: [0, 0] },
-                { vertices: [0.5, 0.5,  -0.5, 1], normals: [1, 0, 0], texCoords: [1, 0] },
-                { vertices: [0.5,  0.5,  0.5, 1], normals: [1, 0, 0], texCoords: [1, 1] },
-                { vertices: [0.5,  -0.5, 0.5, 1], normals: [1, 0, 0], texCoords: [0, 1] },
-                { vertices: [ -0.5, -0.5, -0.5, 1], normals: [-1, 0, 0], texCoords: [0, 0] },
-                { vertices: [ -0.5, 0.5,  -0.5, 1], normals: [-1, 0, 0], texCoords: [1, 0] },
-                { vertices: [ -0.5,  0.5,  0.5, 1], normals: [-1, 0, 0], texCoords: [1, 1] },
-                { vertices: [ -0.5,  -0.5, 0.5, 1], normals: [-1, 0, 0], texCoords: [0, 1] }            
-            ],
-            [
-                0, 1, 2,      0, 2, 3,    // Front face
-                4, 5, 6,      4, 6, 7,    // Back face
-                8, 9, 10,     8, 10, 11,  // Top face
-                12, 13, 14,   12, 14, 15, // Bottom face
-                16, 17, 18,   16, 18, 19, // Right face
-                20, 21, 22,   20, 22, 23  // Left face
-            ]
-        )
-        this.createQuadbuffer();
-        // this.createTextTextures();
+            CubeMeshData.vertices as MeshData[],
+            CubeMeshData.indices,
+            [4, 3, 2]
+        );
+        this._quadMesh = new Mesh(
+            QuadMeshData.vertices as MeshData[],
+            QuadMeshData.indices,
+            [4, 2]
+        );
         let canvas = Renderer.instance.canvas;
 
         this.createFramebuffer(canvas.width, canvas.height);
 
-
-        window.addEventListener('resize', this.onCanvasResize.bind(this), false);
+        window.addEventListener("resize", this.onCanvasResize.bind(this), false);
         this.onCanvasResize();
-        
+
         this._texture = this.loadTexture("./working/tile000.png");
         // this._texture = this.loadTexture("./working/keyboard.jpg");
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.enable(gl.BLEND);
         gl.enable(gl.DEPTH_TEST); // Enable depth testing
-    
+
         // gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     }
 
-    onKeyDown() 
-    {
+    onKeyDown() {
         console.log("keydown");
     }
-    
-    private onCanvasResize()
-    {
+
+    private onCanvasResize() {
         let gl = Renderer.instance.gl;
         let canvas = Renderer.instance.canvas;
         canvas.height = window.innerHeight;
@@ -134,38 +136,35 @@ export class Program
         this.createFramebuffer(gl.canvas.width, gl.canvas.height);
     }
 
-    processInput(dt: number)
-    {
+    processInput(dt: number) {
         let editorCamera = Renderer.instance.editorCamera;
-        if (Input.instance.isKeyDown(Keycode.W)) editorCamera.processKeyboard(CameraMovement.FORWARD, dt);
-        if (Input.instance.isKeyDown(Keycode.S)) editorCamera.processKeyboard(CameraMovement.BACKWARD, dt);
-        if (Input.instance.isKeyDown(Keycode.A)) editorCamera.processKeyboard(CameraMovement.LEFT, dt);
-        if (Input.instance.isKeyDown(Keycode.D)) editorCamera.processKeyboard(CameraMovement.RIGHT, dt); 
+        if (Input.instance.isKeyDown(Keycode.W))
+            editorCamera.processKeyboard(CameraMovement.FORWARD, dt);
+        if (Input.instance.isKeyDown(Keycode.S))
+            editorCamera.processKeyboard(CameraMovement.BACKWARD, dt);
+        if (Input.instance.isKeyDown(Keycode.A))
+            editorCamera.processKeyboard(CameraMovement.LEFT, dt);
+        if (Input.instance.isKeyDown(Keycode.D))
+            editorCamera.processKeyboard(CameraMovement.RIGHT, dt);
     }
-    
-    update()
-    {
+
+    update() {
         this._then = Date.now();
         requestAnimationFrame(this.updateFrame.bind(this));
     }
 
-    
-    updateFrame(now: number)
-    {
+    updateFrame(now: number) {
         let gl = Renderer.instance.gl;
         this._elapsed = now - this._then;
-        if (this._elapsed == 0) 
-        {
+        if (this._elapsed == 0) {
             this._fps = 0;
-        }
-        else
-        {
+        } else {
             this._fps = 1000 / this._elapsed;
         }
         this._then = now;
         let dt = this._elapsed / 1000;
         this.processInput(dt);
-        
+
         this._textContext.clearRect(0, 0, this._textCanvas.width, this._textCanvas.height);
         this._textContext.fillText("FPS: " + this.getFps().toFixed(1), 10, 10);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
@@ -176,8 +175,7 @@ export class Program
         requestAnimationFrame(this.updateFrame.bind(this));
     }
 
-    getFps(): number
-    {
+    getFps(): number {
         this._totalFPS += this._fps - (this._frameTimes[this._frameCursor] || 0);
         this._frameTimes[this._frameCursor++] = this._fps;
         this._numFrames = Math.max(this._numFrames, this._frameCursor);
@@ -185,17 +183,23 @@ export class Program
         return this._totalFPS / this._numFrames;
     }
 
-    end()
-    {
+    end() {}
 
-    }
-
-    loadTexture(url: string)
-    {
+    loadTexture(url: string) {
         let gl = Renderer.instance.gl;
         let texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            1,
+            1,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            new Uint8Array([0, 0, 255, 255])
+        );
         let image = new Image();
         image.onload = () => {
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -204,42 +208,13 @@ export class Program
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.generateMipmap(gl.TEXTURE_2D);
             gl.bindTexture(gl.TEXTURE_2D, null);
-        }
+        };
         image.src = url;
         return texture;
     }
-      
+
     isPowerOf2(value: number): boolean {
         return (value & (value - 1)) === 0;
-    }
-
-    private createQuadbuffer()
-    {
-        let gl = Renderer.instance.gl;
-        let quadPositionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, quadPositionBuffer);
-        let vertices = [
-            -1, -1, 0,
-            1, -1,  0,
-            1,  1,  0,
-            -1, -1,  0,
-            1,  1,  0,
-            -1,  1,  0
-        ];
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-        this._buffers.quadPositionBuffer = quadPositionBuffer;
-        let quadTextureCoordBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, quadTextureCoordBuffer);
-        let textureCoordinates = [
-            0.0,  0.0,
-            1.0,  0.0,
-            1.0,  1.0,
-            0.0,  0.0,
-            1.0,  1.0,
-            0.0,  1.0
-        ];
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
-        this._buffers.quadTextureCoordBuffer = quadTextureCoordBuffer;
     }
 
     // private makeTextCanvas(text: string, width: number, height: number)
@@ -294,33 +269,24 @@ export class Program
     //     }
     // }
 
-    private drawQuad()
-    {
+    private drawQuad() {
         let gl = Renderer.instance.gl;
         gl.useProgram(this._shaders.quad.program);
-        gl.viewport(0, 0,  gl.canvas.width, gl.canvas.height);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        let positionLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_position');
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadPositionBuffer);
-        gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(positionLocation);
-        let textureLocation = gl.getAttribLocation(this._shaders.quad.program, 'a_textureCoord');
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._buffers.quadTextureCoordBuffer);
-        const num = 2; // every coordinate composed of 2 values
-        const type = gl.FLOAT; // the data in the buffer is 32-bit float
-        const normalize = false; // don't normalize
-        const stride = 0; // how many bytes to get from one set to the next
-        const offset = 0; // how many bytes inside the buffer to start from
-        gl.vertexAttribPointer(textureLocation, num, type, normalize, stride, offset);
+        let textureLocation = gl.getAttribLocation(this._shaders.quad.program, "a_textureCoord");
         gl.enableVertexAttribArray(textureLocation);
-        let sampler = gl.getUniformLocation(this._shaders.quad.program, 'u_sampler');
+        let sampler = gl.getUniformLocation(this._shaders.quad.program, "u_sampler");
         gl.uniform1i(sampler, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        this._quadMesh.bind();
+        var primitiveType = gl.TRIANGLES;
+        var offset = 0;
+        var count = 6;
+        gl.drawElements(primitiveType, count, gl.UNSIGNED_SHORT, offset);
     }
 
-    private deleteFramebuffer()
-    {
+    private deleteFramebuffer() {
         let gl = Renderer.instance.gl;
         if (this._buffers.framebuffer) gl.deleteFramebuffer(this._buffers.framebuffer);
         if (this._frameBufferTexture) gl.deleteTexture(this._frameBufferTexture);
@@ -328,8 +294,7 @@ export class Program
         this._frameBufferTexture = null;
     }
 
-    private createFramebuffer(width: number, height: number)
-    {
+    private createFramebuffer(width: number, height: number) {
         let gl = Renderer.instance.gl;
         this.deleteFramebuffer();
 
@@ -343,20 +308,30 @@ export class Program
         this._buffers.framebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
         const attachmentPoint = gl.COLOR_ATTACHMENT0;
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this._frameBufferTexture, 0);
-        
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,
+            attachmentPoint,
+            gl.TEXTURE_2D,
+            this._frameBufferTexture,
+            0
+        );
+
         this._buffers.depthBuffer = gl.createRenderbuffer();
         gl.bindRenderbuffer(gl.RENDERBUFFER, this._buffers.depthBuffer);
         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this._buffers.depthBuffer);
-        
+        gl.framebufferRenderbuffer(
+            gl.FRAMEBUFFER,
+            gl.DEPTH_ATTACHMENT,
+            gl.RENDERBUFFER,
+            this._buffers.depthBuffer
+        );
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.bindRenderbuffer(gl.RENDERBUFFER, null);
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
-    private drawScene(deltaTime: number)
-    {
+    private drawScene(deltaTime: number) {
         let gl = Renderer.instance.gl;
         let speed = 60 * deltaTime;
         // Tell WebGL how to convert from clip space to pixels
@@ -374,13 +349,12 @@ export class Program
 
             // // Bind the texture to texture unit 0
             gl.bindTexture(gl.TEXTURE_2D, this._texture);
-            let sampler = gl.getUniformLocation(this._shaders.phong.program, 'u_sampler');
-            
+            let sampler = gl.getUniformLocation(this._shaders.phong.program, "u_sampler");
+
             // Tell the shader we bound the texture to texture unit 0
             gl.uniform1i(sampler, 0);
         }
-        
-        
+
         // let projectionMatrix = Mat4.orthographic(gl.canvas.clientWidth, gl.canvas.clientHeight, 400);
         let modelMatrix = new Mat4();
         modelMatrix.translate(0, 0, -6);
@@ -388,27 +362,32 @@ export class Program
         modelMatrix.rotateX(degToRad(this._cubeRotation));
         modelMatrix.rotateY(degToRad(this._cubeRotation));
         modelMatrix.rotateZ(degToRad(this._cubeRotation));
-        
-        // modelMatrix.translate(0, 0, -6);
-        
-        const fieldOfView = degToRad(45);   // in radians
-        const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-        const zNear = 0.1;
-        const zFar = 100;
-
-        // Compute the matrices
 
         // let projectionMatrix = Mat4.perspective(fieldOfView, aspect, zNear, zFar);
-        var projectionMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_projectionMatrix");
-        var modelMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_modelMatrix");
+        var projectionMatrixLocation = gl.getUniformLocation(
+            this._shaders.phong.program,
+            "u_projectionMatrix"
+        );
+        var modelMatrixLocation = gl.getUniformLocation(
+            this._shaders.phong.program,
+            "u_modelMatrix"
+        );
         var viewMatrixLocation = gl.getUniformLocation(this._shaders.phong.program, "u_viewMatrix");
 
         // Set the matrix.
         // Renderer.instance.editorCamera.projectionMatrix.values
-        gl.uniformMatrix4fv(projectionMatrixLocation, false, Renderer.instance.editorCamera.projectionMatrix.values);
-        gl.uniformMatrix4fv(viewMatrixLocation, false, Renderer.instance.editorCamera.viewMatrix.values);
+        gl.uniformMatrix4fv(
+            projectionMatrixLocation,
+            false,
+            Renderer.instance.editorCamera.projectionMatrix.values
+        );
+        gl.uniformMatrix4fv(
+            viewMatrixLocation,
+            false,
+            Renderer.instance.editorCamera.viewMatrix.values
+        );
         gl.uniformMatrix4fv(modelMatrixLocation, false, modelMatrix.values);
-    
+
         // Draw the geometry.
         var primitiveType = gl.TRIANGLES;
         var offset = 0;
@@ -419,5 +398,5 @@ export class Program
         this._cubeMesh.unbind();
         gl.bindTexture(gl.TEXTURE_2D, null);
         this._cubeRotation += speed;
-      }
+    }
 }

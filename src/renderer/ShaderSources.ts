@@ -31,11 +31,11 @@ export const fsPhongSource = `#version 300 es
 export const vsFrameBufferSource = `#version 300 es
     in vec4 a_position;
     in vec2 a_textureCoord;
-
     out vec2 v_textureCoord;
 
     void main() {
-        gl_Position = a_position;
+        vec4 pos = vec4(a_position.x * 2.0, a_position.y * 2.0, a_position.z * 2.0, 1.0);
+        gl_Position = pos;
         v_textureCoord = a_textureCoord;
     }
 `;

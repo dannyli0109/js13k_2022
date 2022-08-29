@@ -1,7 +1,3 @@
-export class Framebuffer
-{
-    constructor()
-    {
-
-    }
+export class Framebuffer {
+    constructor() {}
 }
