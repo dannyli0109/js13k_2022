@@ -2,14 +2,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Program = void 0;
-var Input_1 = require("./gameplay/Input");
+require("./gameplay/Input");
 var Mat4_1 = require("./mathLib/Mat4");
 var Util_1 = require("./mathLib/Util");
-var Camera_1 = require("./renderer/Camera");
+require("./renderer/Camera");
 var Mesh_1 = require("./renderer/Mesh");
 var MeshData_1 = require("./renderer/MeshData");
 var Renderer_1 = require("./renderer/Renderer");
 var ShaderSources_1 = require("./renderer/ShaderSources");
+var Texture_1 = require("./renderer/Texture");
 var alphabets = [
     "a",
     "b",
@@ -51,8 +52,6 @@ var Program = (function () {
     }
     Program.prototype.init = function () {
         var gl = Renderer_1.Renderer.instance.gl;
-        var a = Input_1.Input.instance.onKey(Input_1.Keycode.W, this.onKeyDown.bind(this));
-        a.disconnect();
         this._textCanvas = document.getElementById("textCanvas");
         this._textContext = this._textCanvas.getContext("2d");
         this._buffers = {};
@@ -65,7 +64,8 @@ var Program = (function () {
         this.createFramebuffer(canvas.width, canvas.height);
         window.addEventListener("resize", this.onCanvasResize.bind(this), false);
         this.onCanvasResize();
-        this._texture = this.loadTexture("./working/tile000.png");
+        this._texture = new Texture_1.Texture();
+        this._texture.load("./working/tile000.png");
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.enable(gl.BLEND);
@@ -82,15 +82,6 @@ var Program = (function () {
         this.createFramebuffer(gl.canvas.width, gl.canvas.height);
     };
     Program.prototype.processInput = function (dt) {
-        var editorCamera = Renderer_1.Renderer.instance.editorCamera;
-        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.W))
-            editorCamera.processKeyboard(Camera_1.CameraMovement.FORWARD, dt);
-        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.S))
-            editorCamera.processKeyboard(Camera_1.CameraMovement.BACKWARD, dt);
-        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.A))
-            editorCamera.processKeyboard(Camera_1.CameraMovement.LEFT, dt);
-        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.D))
-            editorCamera.processKeyboard(Camera_1.CameraMovement.RIGHT, dt);
     };
     Program.prototype.update = function () {
         this._then = Date.now();
@@ -107,13 +98,12 @@ var Program = (function () {
         }
         this._then = now;
         var dt = this._elapsed / 1000;
-        this.processInput(dt);
+        Renderer_1.Renderer.instance.editorCamera.update(dt);
         this._textContext.clearRect(0, 0, this._textCanvas.width, this._textCanvas.height);
         this._textContext.fillText("FPS: " + this.getFps().toFixed(1), 10, 10);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
         this.drawScene(dt);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
         this.drawQuad();
         requestAnimationFrame(this.updateFrame.bind(this));
     };
@@ -125,26 +115,6 @@ var Program = (function () {
         return this._totalFPS / this._numFrames;
     };
     Program.prototype.end = function () { };
-    Program.prototype.loadTexture = function (url) {
-        var gl = Renderer_1.Renderer.instance.gl;
-        var texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
-        var image = new Image();
-        image.onload = function () {
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.generateMipmap(gl.TEXTURE_2D);
-            gl.bindTexture(gl.TEXTURE_2D, null);
-        };
-        image.src = url;
-        return texture;
-    };
-    Program.prototype.isPowerOf2 = function (value) {
-        return (value & (value - 1)) === 0;
-    };
     Program.prototype.drawQuad = function () {
         var gl = Renderer_1.Renderer.instance.gl;
         gl.useProgram(this._shaders.quad.program);
@@ -153,8 +123,7 @@ var Program = (function () {
         gl.clear(gl.COLOR_BUFFER_BIT);
         var textureLocation = gl.getAttribLocation(this._shaders.quad.program, "a_textureCoord");
         gl.enableVertexAttribArray(textureLocation);
-        var sampler = gl.getUniformLocation(this._shaders.quad.program, "u_sampler");
-        gl.uniform1i(sampler, 0);
+        this._shaders.quad.bindTexture("u_sampler", this._frameBufferTexture, 0);
         this._quadMesh.bind();
         var primitiveType = gl.TRIANGLES;
         var offset = 0;
@@ -166,24 +135,20 @@ var Program = (function () {
         if (this._buffers.framebuffer)
             gl.deleteFramebuffer(this._buffers.framebuffer);
         if (this._frameBufferTexture)
-            gl.deleteTexture(this._frameBufferTexture);
+            gl.deleteTexture(this._frameBufferTexture.texture);
         this._buffers.framebuffer = null;
         this._frameBufferTexture = null;
     };
     Program.prototype.createFramebuffer = function (width, height) {
         var gl = Renderer_1.Renderer.instance.gl;
         this.deleteFramebuffer();
-        this._frameBufferTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        this._frameBufferTexture = new Texture_1.Texture();
+        this._frameBufferTexture.initTexture(width, height);
+        gl.bindTexture(gl.TEXTURE_2D, this._frameBufferTexture.texture);
         this._buffers.framebuffer = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, this._buffers.framebuffer);
         var attachmentPoint = gl.COLOR_ATTACHMENT0;
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this._frameBufferTexture, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, this._frameBufferTexture.texture, 0);
         this._buffers.depthBuffer = gl.createRenderbuffer();
         gl.bindRenderbuffer(gl.RENDERBUFFER, this._buffers.depthBuffer);
         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
@@ -201,12 +166,7 @@ var Program = (function () {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.useProgram(this._shaders.phong.program);
         this._cubeMesh.bind();
-        {
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, this._texture);
-            var sampler = gl.getUniformLocation(this._shaders.phong.program, "u_sampler");
-            gl.uniform1i(sampler, 0);
-        }
+        this._shaders.phong.bindTexture("u_sampler", this._texture, 0);
         var modelMatrix = new Mat4_1.Mat4();
         modelMatrix.translate(0, 0, -6);
         modelMatrix.scale(0.5, 0.5, 0.5);
@@ -231,7 +191,7 @@ var Program = (function () {
 }());
 exports.Program = Program;
 
-},{"./gameplay/Input":3,"./mathLib/Mat4":5,"./mathLib/Util":6,"./renderer/Camera":8,"./renderer/Mesh":10,"./renderer/MeshData":11,"./renderer/Renderer":12,"./renderer/ShaderSources":14}],2:[function(require,module,exports){
+},{"./gameplay/Input":3,"./mathLib/Mat4":5,"./mathLib/Util":6,"./renderer/Camera":9,"./renderer/Mesh":11,"./renderer/MeshData":12,"./renderer/Renderer":13,"./renderer/ShaderSources":15,"./renderer/Texture":16}],2:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Events = void 0;
@@ -294,6 +254,7 @@ var Events;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Input = exports.MouseButton = exports.Keycode = void 0;
+var Vec2_1 = require("../mathLib/Vec2");
 var Renderer_1 = require("../renderer/Renderer");
 var Events_1 = require("./Events");
 var Keycode;
@@ -325,42 +286,56 @@ var Input = (function () {
     });
     Input.prototype.init = function () {
         var _this = this;
-        this._keys = {};
-        this._mouse = {};
-        addEventListener("keydown", function (e) {
+        this.reset();
+        document.addEventListener("keydown", function (e) {
             _this._keys[e.code] = true;
-            Events_1.Events.dispatch(e.code, e);
         });
-        addEventListener("keyup", function (e) {
+        document.addEventListener("keyup", function (e) {
             _this._keys[e.code] = false;
         });
         Renderer_1.Renderer.instance.canvas.addEventListener("mousemove", function (e) {
-            e.preventDefault();
+            _this._mouseDelta = new Vec2_1.Vec2(e.movementX, e.movementY);
+            _this._mousePosition = new Vec2_1.Vec2(e.clientX, e.clientY);
             Events_1.Events.dispatch("mousemove", e);
-        });
+        }, true);
         Renderer_1.Renderer.instance.canvas.addEventListener("mousedown", function (e) {
-            e.preventDefault();
             _this._mouse[e.button] = true;
-            Events_1.Events.dispatch("mouse".concat(e.button), e);
-        });
+            Events_1.Events.dispatch("mousedown", e);
+        }, true);
         Renderer_1.Renderer.instance.canvas.addEventListener("mouseup", function (e) {
-            e.preventDefault();
             _this._mouse[e.button] = false;
+            Events_1.Events.dispatch("mouseup", e);
+        }, true);
+        Renderer_1.Renderer.instance.canvas.addEventListener("blur", function () {
+            _this.reset();
         });
         Renderer_1.Renderer.instance.canvas.oncontextmenu = function (e) {
             e.preventDefault();
         };
     };
+    Input.prototype.reset = function () {
+        this._keys = {};
+        this._mouse = {};
+    };
     Object.defineProperty(Input.prototype, "mouseDelta", {
-        get: function () { return this._mouseDelta; },
+        get: function () {
+            return this._mouseDelta;
+        },
         enumerable: false,
         configurable: true
     });
-    Input.prototype.onKey = function (key, callback) {
-        return Events_1.Events.add(key, callback);
+    Object.defineProperty(Input.prototype, "mousePosition", {
+        get: function () {
+            return this._mousePosition;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Input.prototype.onKeyDown = function (callback) {
+        return Events_1.Events.add("keydown", callback);
     };
     Input.prototype.onMouseClick = function (button, callback) {
-        return Events_1.Events.add("mouse".concat(button), callback);
+        return Events_1.Events.add("mousedown", callback);
     };
     Input.prototype.onMouseMove = function (callback) {
         return Events_1.Events.add("mousemove", callback);
@@ -376,7 +351,7 @@ var Input = (function () {
 }());
 exports.Input = Input;
 
-},{"../renderer/Renderer":12,"./Events":2}],4:[function(require,module,exports){
+},{"../mathLib/Vec2":7,"../renderer/Renderer":13,"./Events":2}],4:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var Program_1 = require("./Program");
@@ -761,6 +736,60 @@ exports.degToRad = degToRad;
 },{}],7:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.Vec2 = void 0;
+var Vec2 = (function () {
+    function Vec2() {
+        var values = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            values[_i] = arguments[_i];
+        }
+        if (values.length === 1) {
+            this._values = [values[0], values[0]];
+        }
+        else if (values.length === 2) {
+            this._values = values;
+        }
+        else if (values.length === 0) {
+            this._values = [0, 0];
+        }
+        else {
+            throw new Error("Invalid number of values");
+        }
+    }
+    Object.defineProperty(Vec2.prototype, "x", {
+        get: function () {
+            return this._values[0];
+        },
+        set: function (value) {
+            this._values[0] = value;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Object.defineProperty(Vec2.prototype, "y", {
+        get: function () {
+            return this._values[1];
+        },
+        set: function (value) {
+            this._values[1] = value;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Object.defineProperty(Vec2.prototype, "values", {
+        get: function () {
+            return this._values;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    return Vec2;
+}());
+exports.Vec2 = Vec2;
+
+},{}],8:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 exports.Vec3 = void 0;
 var Vec3 = (function () {
     function Vec3() {
@@ -853,7 +882,7 @@ var Vec3 = (function () {
 }());
 exports.Vec3 = Vec3;
 
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = function (d, b) {
@@ -924,6 +953,7 @@ var EditorPerspectiveCamera = (function (_super) {
         _this._movementSpeed = movementSpeed;
         _this._mouseSensitivity = mouseSensitivity;
         _this._zoom = zoom;
+        _this._moveVec = new Vec3_1.Vec3();
         _this.updateVectors();
         Input_1.Input.instance.onMouseMove(function (e) {
             if (Input_1.Input.instance.isMouseDown(Input_1.MouseButton.Right)) {
@@ -974,6 +1004,16 @@ var EditorPerspectiveCamera = (function (_super) {
             this._position = this._position.add(this._right.multiply(velocity));
         }
     };
+    EditorPerspectiveCamera.prototype.update = function (dt) {
+        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.W))
+            this.processKeyboard(CameraMovement.FORWARD, dt);
+        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.S))
+            this.processKeyboard(CameraMovement.BACKWARD, dt);
+        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.A))
+            this.processKeyboard(CameraMovement.LEFT, dt);
+        if (Input_1.Input.instance.isKeyDown(Input_1.Keycode.D))
+            this.processKeyboard(CameraMovement.RIGHT, dt);
+    };
     EditorPerspectiveCamera.prototype.processMouseMovement = function (xoffset, yoffset, constrainPitch) {
         if (constrainPitch === void 0) { constrainPitch = true; }
         xoffset *= this._mouseSensitivity;
@@ -992,15 +1032,34 @@ var EditorPerspectiveCamera = (function (_super) {
 }(Camera));
 exports.EditorPerspectiveCamera = EditorPerspectiveCamera;
 
-},{"../gameplay/Input":3,"../mathLib/Mat4":5,"../mathLib/Util":6,"../mathLib/Vec3":7,"./Renderer":12}],9:[function(require,module,exports){
+},{"../gameplay/Input":3,"../mathLib/Mat4":5,"../mathLib/Util":6,"../mathLib/Vec3":8,"./Renderer":13}],10:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Material = void 0;
+exports.Material = exports.MaterialAttribute = exports.MaterialAttributeType = void 0;
+var MaterialAttributeType;
+(function (MaterialAttributeType) {
+    MaterialAttributeType[MaterialAttributeType["Texture"] = 0] = "Texture";
+    MaterialAttributeType[MaterialAttributeType["Float"] = 1] = "Float";
+    MaterialAttributeType[MaterialAttributeType["Int"] = 2] = "Int";
+    MaterialAttributeType[MaterialAttributeType["Vector2"] = 3] = "Vector2";
+    MaterialAttributeType[MaterialAttributeType["Vector3"] = 4] = "Vector3";
+    MaterialAttributeType[MaterialAttributeType["Mat4"] = 5] = "Mat4";
+    MaterialAttributeType[MaterialAttributeType["Bool"] = 6] = "Bool";
+    MaterialAttributeType[MaterialAttributeType["None"] = 7] = "None";
+})(MaterialAttributeType = exports.MaterialAttributeType || (exports.MaterialAttributeType = {}));
+var MaterialAttribute = (function () {
+    function MaterialAttribute(name, type, value) {
+        this.name = name;
+        this.type = type;
+        this.value = value;
+    }
+    return MaterialAttribute;
+}());
+exports.MaterialAttribute = MaterialAttribute;
 var Material = (function () {
-    function Material(program, textures) {
-        if (textures === void 0) { textures = []; }
+    function Material(program) {
         this._program = program;
-        this._textures = textures;
+        this._parameters = [];
     }
     Object.defineProperty(Material.prototype, "program", {
         get: function () {
@@ -1009,23 +1068,29 @@ var Material = (function () {
         enumerable: false,
         configurable: true
     });
-    Object.defineProperty(Material.prototype, "textures", {
-        get: function () {
-            return this._textures;
-        },
-        enumerable: false,
-        configurable: true
-    });
+    Material.prototype.addAttribute = function (attribute) {
+        if (this.find(attribute.name) === -1) {
+            this._parameters.push(attribute);
+        }
+    };
+    Material.prototype.find = function (name) {
+        for (var i = 0; i < this._parameters.length; i++) {
+            if (this._parameters[i].name === name) {
+                return i;
+            }
+        }
+        return -1;
+    };
     Material.prototype.bind = function () {
-        for (var i = 0; i < this._textures.length; i++) {
-            this._program.setUniform1i(this._textures[i].name, i);
+        for (var i = 0; i < this._parameters.length; i++) {
+            var parameter = this._parameters[i];
         }
     };
     return Material;
 }());
 exports.Material = Material;
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Mesh = void 0;
@@ -1092,7 +1157,7 @@ var Mesh = (function () {
 }());
 exports.Mesh = Mesh;
 
-},{"../mathLib/Mat4":5,"./Material":9,"./Renderer":12}],11:[function(require,module,exports){
+},{"../mathLib/Mat4":5,"./Material":10,"./Renderer":13}],12:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.QuadMeshData = exports.CubeMeshData = void 0;
@@ -1138,7 +1203,7 @@ exports.QuadMeshData = {
     indices: [0, 1, 2, 0, 2, 3],
 };
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Renderer = void 0;
@@ -1211,7 +1276,7 @@ var Renderer = (function () {
 }());
 exports.Renderer = Renderer;
 
-},{"./Camera":8,"./ShaderProgram":13}],13:[function(require,module,exports){
+},{"./Camera":9,"./ShaderProgram":14}],14:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ShaderProgram = void 0;
@@ -1272,11 +1337,17 @@ var ShaderProgram = (function () {
         gl.uniform1i(location, value);
         this._uniforms[name] = location;
     };
+    ShaderProgram.prototype.bindTexture = function (name, texture, textureUnit) {
+        var gl = Renderer_1.Renderer.instance.gl;
+        gl.activeTexture(gl.TEXTURE0 + textureUnit);
+        gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+        this.setUniform1i(name, textureUnit);
+    };
     return ShaderProgram;
 }());
 exports.ShaderProgram = ShaderProgram;
 
-},{"./Renderer":12}],14:[function(require,module,exports){
+},{"./Renderer":13}],15:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fsFrameBufferSource = exports.vsFrameBufferSource = exports.fsPhongSource = exports.vsPhongSource = void 0;
@@ -1285,5 +1356,49 @@ exports.fsPhongSource = "#version 300 es\n    precision highp float;\n    in vec
 exports.vsFrameBufferSource = "#version 300 es\n    in vec4 a_position;\n    in vec2 a_textureCoord;\n    out vec2 v_textureCoord;\n\n    void main() {\n        vec4 pos = vec4(a_position.x * 2.0, a_position.y * 2.0, a_position.z * 2.0, 1.0);\n        gl_Position = pos;\n        v_textureCoord = a_textureCoord;\n    }\n";
 exports.fsFrameBufferSource = "#version 300 es\n    precision highp float;\n    in vec2 v_textureCoord;\n    uniform sampler2D u_sampler;\n    out vec4 out_color;\n\n    void main()\n    {\n        highp vec4 color = texture(u_sampler, v_textureCoord);\n        out_color = vec4(color.r, color.g, color.b, color.a);\n    }\n";
 
-},{}]},{},[4])
+},{}],16:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Texture = void 0;
+var Renderer_1 = require("./Renderer");
+var Texture = (function () {
+    function Texture() {
+    }
+    Texture.prototype.load = function (url) {
+        var _this = this;
+        this.initTexture(1, 1);
+        var image = new Image();
+        image.onload = function () {
+            var gl = Renderer_1.Renderer.instance.gl;
+            gl.bindTexture(gl.TEXTURE_2D, _this._texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+        };
+        image.src = url;
+    };
+    Texture.prototype.initTexture = function (width, height) {
+        var gl = Renderer_1.Renderer.instance.gl;
+        var texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        this._texture = texture;
+    };
+    Object.defineProperty(Texture.prototype, "texture", {
+        get: function () {
+            return this._texture;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    return Texture;
+}());
+exports.Texture = Texture;
+
+},{"./Renderer":13}]},{},[4])
 //# sourceMappingURL=bundle.js.map

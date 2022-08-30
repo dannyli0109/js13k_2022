@@ -1,4 +1,5 @@
 import { Renderer } from "./Renderer";
+import type { Texture } from "./Texture";
 
 type Uniforms = {
     [key: string]: WebGLUniformLocation;
@@ -15,7 +16,11 @@ export class ShaderProgram {
         return this._program;
     }
 
-    initShaderProgram(gl: WebGL2RenderingContext, vertexShaderSource: string, fragmentShaderSource: string) {
+    initShaderProgram(
+        gl: WebGL2RenderingContext,
+        vertexShaderSource: string,
+        fragmentShaderSource: string
+    ) {
         const vertexShader = this.loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
         const fragmentShader = this.loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
 
@@ -25,7 +30,9 @@ export class ShaderProgram {
         gl.linkProgram(this._program);
 
         if (!gl.getProgramParameter(this._program, gl.LINK_STATUS)) {
-            alert(`Unable to initialize the shader program: ${gl.getProgramInfoLog(this._program)}`);
+            alert(
+                `Unable to initialize the shader program: ${gl.getProgramInfoLog(this._program)}`
+            );
         }
     }
 
@@ -67,5 +74,12 @@ export class ShaderProgram {
         let location = this.getUniformLocation(name);
         gl.uniform1i(location, value);
         this._uniforms[name] = location;
+    }
+
+    bindTexture(name: string, texture: Texture, textureUnit: number) {
+        let gl = Renderer.instance.gl;
+        gl.activeTexture(gl.TEXTURE0 + textureUnit);
+        gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+        this.setUniform1i(name, textureUnit);
     }
 }

@@ -43,6 +43,7 @@ export class EditorPerspectiveCamera extends Camera {
     private _movementSpeed: number;
     private _mouseSensitivity: number;
     private _zoom: number;
+    private _moveVec: Vec3;
 
     constructor(
         position: Vec3 = new Vec3(0, 0, 0),
@@ -71,6 +72,8 @@ export class EditorPerspectiveCamera extends Camera {
         this._movementSpeed = movementSpeed;
         this._mouseSensitivity = mouseSensitivity;
         this._zoom = zoom;
+
+        this._moveVec = new Vec3();
         this.updateVectors();
 
         Input.instance.onMouseMove(e => {
@@ -116,6 +119,13 @@ export class EditorPerspectiveCamera extends Camera {
         if (dir === CameraMovement.RIGHT) {
             this._position = this._position.add(this._right.multiply(velocity));
         }
+    }
+
+    public update(dt) {
+        if (Input.instance.isKeyDown(Keycode.W)) this.processKeyboard(CameraMovement.FORWARD, dt);
+        if (Input.instance.isKeyDown(Keycode.S)) this.processKeyboard(CameraMovement.BACKWARD, dt);
+        if (Input.instance.isKeyDown(Keycode.A)) this.processKeyboard(CameraMovement.LEFT, dt);
+        if (Input.instance.isKeyDown(Keycode.D)) this.processKeyboard(CameraMovement.RIGHT, dt);
     }
 
     public processMouseMovement(xoffset: number, yoffset: number, constrainPitch: boolean = true) {
